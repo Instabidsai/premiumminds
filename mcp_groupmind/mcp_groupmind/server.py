@@ -23,46 +23,65 @@ mcp = FastMCP("groupmind")
 
 # ── Helpers ─────────────────────────────────────────────────────
 
-def _graphiti_call(method_name: str, arguments: dict[str, Any]) -> Any:
-    """Synchronous JSON-RPC call to the Graphiti MCP server."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {"name": method_name, "arguments": arguments},
-    }
+def _graphiti_search(query: str, group_ids: list[str] | None = None, num_results: int = 10) -> dict:
+    """Call the Graphiti REST /search endpoint.
+
+    Graphiti is a FastAPI REST service (zepai/graphiti image), not an MCP
+    server. The endpoint shape is POST /search {query, num_results, group_ids}
+    returning {facts: [{uuid,name,fact,source_node_uuid,target_node_uuid,valid_at,...}]}.
+    """
+    body: dict[str, Any] = {"query": query, "num_results": num_results}
+    if group_ids:
+        body["group_ids"] = group_ids
     with httpx.Client(timeout=60) as client:
-        r = client.post(GRAPHITI_MCP_URL, json=payload)
-        r.raise_for_status()
-        body = r.json()
-    if "error" in body:
-        raise RuntimeError(body["error"])
-    return body.get("result")
+        r = client.post(f"{GRAPHITI_MCP_URL.rstrip('/')}/search", json=body)
+        if r.status_code >= 400:
+            return {"facts": [], "error": f"graphiti {r.status_code}: {r.text[:200]}"}
+        return r.json()
+
+
+def _graphiti_episodes(group_id: str, last_n: int = 100) -> list[dict]:
+    """Call Graphiti REST GET /episodes/{group_id}."""
+    with httpx.Client(timeout=60) as client:
+        r = client.get(f"{GRAPHITI_MCP_URL.rstrip('/')}/episodes/{group_id}?last_n={last_n}")
+        if r.status_code >= 400:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else data.get("episodes", [])
 
 
 def _resolve_author_id(handle: str | None, agent_name: str | None) -> str:
-    """Get or create an author row for a human handle or agent name."""
+    """Get or create an author row for a human handle or agent name.
+
+    Uses plain .execute() (not .maybe_single()) because maybe_single() can
+    return None in supabase-py 2.x when no row is found, which crashes
+    attribute access.
+    """
     if handle:
-        member = (
+        member_rows = (
             sb.table("members")
             .select("id")
             .eq("handle", handle)
-            .single()
+            .limit(1)
             .execute()
         )
+        if not member_rows.data:
+            raise ValueError(f"Member with handle '{handle}' not found")
+        member_id = member_rows.data[0]["id"]
+
         existing = (
             sb.table("authors")
             .select("id")
             .eq("kind", "human")
-            .eq("member_id", member.data["id"])
-            .maybe_single()
+            .eq("member_id", member_id)
+            .limit(1)
             .execute()
         )
         if existing.data:
-            return existing.data["id"]
+            return existing.data[0]["id"]
         created = (
             sb.table("authors")
-            .insert({"kind": "human", "member_id": member.data["id"]})
+            .insert({"kind": "human", "member_id": member_id})
             .execute()
         )
         return created.data[0]["id"]
@@ -73,11 +92,11 @@ def _resolve_author_id(handle: str | None, agent_name: str | None) -> str:
             .select("id")
             .eq("kind", "agent")
             .eq("agent_name", agent_name)
-            .maybe_single()
+            .limit(1)
             .execute()
         )
         if existing.data:
-            return existing.data["id"]
+            return existing.data[0]["id"]
         created = (
             sb.table("authors")
             .insert({"kind": "agent", "agent_name": agent_name})
@@ -253,27 +272,22 @@ def get_recent_messages(
 def semantic_search(query: str, channel_slug: str | None = None, num_results: int = 10) -> Any:
     """Search the group knowledge graph for semantically related content.
 
-    Uses Graphiti's search_nodes under the hood. Optionally scope to a channel.
+    Uses Graphiti's REST /search endpoint. Optionally scope to a channel.
+    Returns facts with source/target node UUIDs, fact text, and temporal windows.
     """
-    args: dict[str, Any] = {"query": query, "num_results": num_results}
-    if channel_slug:
-        args["group_ids"] = [channel_slug]
-    return _graphiti_call("search_nodes", args)
+    group_ids = [channel_slug] if channel_slug else None
+    return _graphiti_search(query, group_ids=group_ids, num_results=num_results)
 
 
 @mcp.tool()
 def who_knows_about(topic: str, channel_slug: str | None = None) -> Any:
     """Find people (human or agent) who have discussed a topic.
 
-    Searches the knowledge graph for entity nodes related to the topic,
-    then cross-references with message authors.
+    Searches the knowledge graph for facts related to the topic, then
+    cross-references with message authors for broader coverage.
     """
-    args: dict[str, Any] = {"query": topic, "num_results": 20}
-    if channel_slug:
-        args["group_ids"] = [channel_slug]
-
-    # Search for edges that relate people to the topic
-    edges = _graphiti_call("search", args)
+    group_ids = [channel_slug] if channel_slug else None
+    edges = _graphiti_search(topic, group_ids=group_ids, num_results=20)
 
     # Also search message bodies directly for broader coverage
     query_builder = (
@@ -407,9 +421,10 @@ def get_digest(channel_slug: str, hours: int = 24) -> dict:
 
     # Top topics via Graphiti — get recent episode entities
     try:
-        top_topics = _graphiti_call(
-            "search_nodes",
-            {"query": f"recent topics in {channel_slug}", "group_ids": [channel_slug], "num_results": 5},
+        top_topics = _graphiti_search(
+            f"recent topics in {channel_slug}",
+            group_ids=[channel_slug],
+            num_results=5,
         )
     except Exception:
         top_topics = []
