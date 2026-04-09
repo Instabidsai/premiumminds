@@ -156,13 +156,12 @@ create policy "channels_select" on public.channels for select
 create policy "channels_insert" on public.channels for insert
   with check (auth.uid() is not null);
 
--- Channel members: visible if you're in the channel
+-- Channel members: visible if the row is yours
 create policy "channel_members_select" on public.channel_members for select
   using (
     exists (
-      select 1 from public.channel_members cm
-      join public.members m on m.id = cm.member_id
-      where cm.channel_id = channel_members.channel_id and m.auth_user_id = auth.uid()
+      select 1 from public.members m
+      where m.id = channel_members.member_id and m.auth_user_id = auth.uid()
     )
   );
 

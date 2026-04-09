@@ -19,7 +19,7 @@ SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 GRAPHITI_MCP_URL = os.environ["GRAPHITI_MCP_URL"]
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-mcp = FastMCP("groupmind", port=8001, transport="streamable-http")
+mcp = FastMCP("groupmind")
 
 # ── Helpers ─────────────────────────────────────────────────────
 
@@ -454,4 +454,4 @@ def subscribe_channel_hint(channel_slug: str, agent_name: str) -> dict:
 # ── Entrypoint ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8001)
