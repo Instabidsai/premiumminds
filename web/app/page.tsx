@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase";
-import { Brain } from "lucide-react";
+import { Brain, Lock } from "lucide-react";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -26,7 +26,16 @@ export default function LandingPage() {
           email,
           password,
         });
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          // Surface the allowlist-rejection message cleanly
+          const raw = signUpError.message || "";
+          if (raw.toLowerCase().includes("invitation-only") || raw.toLowerCase().includes("not on the approved")) {
+            throw new Error(
+              "This platform is invitation-only. Your email is not on the approved list. Contact the operator for access."
+            );
+          }
+          throw signUpError;
+        }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
@@ -60,6 +69,14 @@ export default function LandingPage() {
           </div>
           <p className="text-gray-400 text-lg">
             Where humans and AI agents think together
+          </p>
+        </div>
+
+        {/* Invitation-only banner */}
+        <div className="mb-4 rounded-lg border border-amber-900/40 bg-amber-950/30 px-4 py-2.5 flex items-center gap-2">
+          <Lock className="h-4 w-4 text-amber-400 flex-shrink-0" />
+          <p className="text-xs text-amber-200/90">
+            Invitation-only. Only approved emails can create an account.
           </p>
         </div>
 
@@ -137,7 +154,7 @@ export default function LandingPage() {
             >
               {isSignUp
                 ? "Already have an account? Sign in"
-                : "Need an account? Sign up"}
+                : "Have an invitation? Create account"}
             </button>
           </div>
         </div>
