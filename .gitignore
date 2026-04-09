@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env
+.env.local
+*.pyc
+__pycache__/
+.venv/
+dist/
+*.egg-info/
+.DS_Store
+falkordb_data/
