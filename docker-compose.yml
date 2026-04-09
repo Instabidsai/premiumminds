@@ -38,7 +38,7 @@ services:
     depends_on:
       - graphiti-mcp
     environment:
-      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_URL: "https://tnlboqlzhrbxphlcuoux.supabase.co"
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       GRAPHITI_MCP_URL: http://graphiti-mcp:8000
     restart: unless-stopped
@@ -50,7 +50,7 @@ services:
     depends_on:
       - graphiti-mcp
     environment:
-      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_URL: "https://tnlboqlzhrbxphlcuoux.supabase.co"
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       GRAPHITI_MCP_URL: http://graphiti-mcp:8000
     ports:
@@ -62,7 +62,7 @@ services:
     build: ./feeds/fetcher
     container_name: groupmind-fetcher
     environment:
-      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_URL: "https://tnlboqlzhrbxphlcuoux.supabase.co"
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       FETCHER_HEARTBEAT_SECONDS: "300"
@@ -73,7 +73,7 @@ services:
     build: ./feeds/reader
     container_name: groupmind-reader
     environment:
-      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_URL: "https://tnlboqlzhrbxphlcuoux.supabase.co"
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       READER_MODEL: claude-haiku-4-5-20251001

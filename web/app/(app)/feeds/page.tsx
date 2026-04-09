@@ -21,7 +21,7 @@ interface Feed {
   source_url: string;
   channel_id: string;
   enabled: boolean;
-  poll_interval_min: number;
+  poll_interval_minutes: number;
   last_polled_at: string | null;
   last_error: string | null;
   created_at: string;
@@ -66,7 +66,7 @@ export default function FeedsPage() {
       .select(
         `
         id, label, kind, source_url, channel_id, enabled,
-        poll_interval_min, last_polled_at, last_error, created_at,
+        poll_interval_minutes, last_polled_at, last_error, created_at,
         channel:channels!feeds_channel_id_fkey ( slug, name )
       `
       )
@@ -125,7 +125,7 @@ export default function FeedsPage() {
         kind,
         source_url: sourceUrl.trim(),
         channel_id: targetChannelId,
-        poll_interval_min: pollInterval,
+        poll_interval_minutes: pollInterval,
         enabled: true,
       });
 
@@ -333,7 +333,7 @@ export default function FeedsPage() {
                         Last polled: {relativeTime(feed.last_polled_at)}
                       </span>
                       <span>
-                        Every {feed.poll_interval_min}m
+                        Every {feed.poll_interval_minutes}m
                       </span>
                       <span>
                         {feed.item_count ?? 0} items

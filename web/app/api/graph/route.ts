@@ -15,40 +15,116 @@ interface GraphEdge {
   weight: number;
 }
 
+interface GraphitiFact {
+  uuid: string;
+  name: string;
+  fact: string;
+  source_node_uuid?: string;
+  target_node_uuid?: string;
+  valid_at?: string;
+  group_id?: string;
+}
+
+/**
+ * Graph API — reads Graphiti /search for a channel and shapes the facts
+ * into React Flow nodes+edges. Falls back to Supabase-based channel graph
+ * if Graphiti is unreachable.
+ */
 export async function GET(request: NextRequest) {
   const channelSlug = request.nextUrl.searchParams.get("channel");
-
-  // Try Graphiti MCP first
   const graphitiUrl = process.env.GRAPHITI_MCP_URL;
+
+  // ── Try Graphiti first ────────────────────────────────────────
   if (graphitiUrl) {
     try {
-      const graphitiRes = await fetch(`${graphitiUrl}/graph`, {
+      const groupIds = channelSlug ? [channelSlug] : undefined;
+      const body: Record<string, unknown> = {
+        query: "*",
+        num_results: 100,
+      };
+      if (groupIds) body.group_ids = groupIds;
+
+      const graphitiRes = await fetch(`${graphitiUrl}/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel: channelSlug }),
+        body: JSON.stringify(body),
       });
+
       if (graphitiRes.ok) {
-        const data = await graphitiRes.json();
-        return Response.json(data);
+        const data = (await graphitiRes.json()) as { facts?: GraphitiFact[] };
+        const facts = data.facts ?? [];
+
+        if (facts.length > 0) {
+          const nodeMap = new Map<string, GraphNode>();
+          const edges: GraphEdge[] = [];
+
+          for (const f of facts) {
+            // Each fact is a triple: source_node -> target_node
+            // with the relation name = f.name and the content = f.fact
+            if (f.source_node_uuid && f.target_node_uuid) {
+              // Add both nodes if not already present (label them by name from the fact text)
+              // We don't have the node names from the fact endpoint alone, so use short IDs
+              // until we upgrade to a node-fetching call. For now, use the relation name as label.
+              if (!nodeMap.has(f.source_node_uuid)) {
+                nodeMap.set(f.source_node_uuid, {
+                  id: f.source_node_uuid,
+                  label: f.fact.split(" ").slice(0, 3).join(" "),
+                  size: 4,
+                  group: f.group_id || "graph",
+                });
+              }
+              if (!nodeMap.has(f.target_node_uuid)) {
+                nodeMap.set(f.target_node_uuid, {
+                  id: f.target_node_uuid,
+                  label: f.fact.split(" ").slice(-3).join(" "),
+                  size: 4,
+                  group: f.group_id || "graph",
+                });
+              }
+              edges.push({
+                source: f.source_node_uuid,
+                target: f.target_node_uuid,
+                weight: 0.6,
+              });
+            } else {
+              // Standalone fact — render as a single node
+              nodeMap.set(f.uuid, {
+                id: f.uuid,
+                label: f.name || f.fact.slice(0, 40),
+                size: 5,
+                group: f.group_id || "graph",
+              });
+            }
+          }
+
+          // Increase size of nodes with more edges
+          const edgeCount = new Map<string, number>();
+          for (const e of edges) {
+            edgeCount.set(e.source, (edgeCount.get(e.source) || 0) + 1);
+            edgeCount.set(e.target, (edgeCount.get(e.target) || 0) + 1);
+          }
+          for (const [id, count] of edgeCount) {
+            const node = nodeMap.get(id);
+            if (node) node.size = Math.min(12, 3 + count);
+          }
+
+          return Response.json({
+            nodes: Array.from(nodeMap.values()),
+            edges,
+          });
+        }
       }
     } catch {
-      // Graphiti unavailable, fall back to Supabase
+      // Graphiti unavailable or errored, fall through to Supabase fallback
     }
   }
 
-  // Fallback: build a simple graph from message frequency
+  // ── Fallback: Supabase channel/author activity graph ─────────
   const cookieStore = await cookies();
   const supabase = createServerClient(cookieStore);
 
-  // Get channels
-  let channelQuery = supabase
-    .from("channels")
-    .select("id, slug, name");
-
-  if (channelSlug) {
-    channelQuery = channelQuery.eq("slug", channelSlug);
-  }
-
+  let channelQuery = supabase.from("channels").select("id, slug, name");
+  if (channelSlug) channelQuery = channelQuery.eq("slug", channelSlug);
   const { data: channels } = await channelQuery;
 
   if (!channels || channels.length === 0) {
@@ -57,156 +133,87 @@ export async function GET(request: NextRequest) {
 
   const channelIds = channels.map((c) => c.id);
 
-  // Get recent messages with authors
   const { data: messages } = await supabase
     .from("messages")
-    .select("id, channel_id, author_id, body, created_at")
+    .select("id, channel_id, author_id")
     .in("channel_id", channelIds)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(300);
 
-  if (!messages || messages.length === 0) {
-    // Return channel nodes at least
-    const nodes: GraphNode[] = channels.map((ch) => ({
-      id: `ch-${ch.id}`,
-      label: `#${ch.name}`,
-      size: 5,
-      group: "channel",
-    }));
-    return Response.json({ nodes, edges: [] });
-  }
-
-  // Build nodes: channels + unique authors
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
 
-  // Channel nodes with message count
-  const channelMsgCount: Record<string, number> = {};
-  messages.forEach((m) => {
-    channelMsgCount[m.channel_id] = (channelMsgCount[m.channel_id] || 0) + 1;
-  });
-
-  channels.forEach((ch) => {
+  // Channel nodes sized by message count
+  const msgCountByChannel: Record<string, number> = {};
+  for (const m of messages || []) {
+    msgCountByChannel[m.channel_id] = (msgCountByChannel[m.channel_id] || 0) + 1;
+  }
+  for (const ch of channels) {
     nodes.push({
       id: `ch-${ch.id}`,
-      label: `#${ch.name}`,
-      size: Math.min(12, 3 + (channelMsgCount[ch.id] || 0) / 10),
+      label: `#${ch.slug}`,
+      size: Math.min(12, 3 + (msgCountByChannel[ch.id] || 0) / 2),
       group: "channel",
     });
-  });
-
-  // Author nodes with activity count
-  const authorActivity: Record<
-    string,
-    { count: number; channels: Set<string> }
-  > = {};
-  messages.forEach((m) => {
-    if (!m.author_id) return;
-    if (!authorActivity[m.author_id]) {
-      authorActivity[m.author_id] = { count: 0, channels: new Set() };
-    }
-    authorActivity[m.author_id].count++;
-    authorActivity[m.author_id].channels.add(m.channel_id);
-  });
-
-  // Fetch author details
-  const authorIds = Object.keys(authorActivity);
-  if (authorIds.length > 0) {
-    const { data: authors } = await supabase
-      .from("authors")
-      .select("id, display_name, agent_name, is_agent")
-      .in("id", authorIds);
-
-    if (authors) {
-      authors.forEach((author) => {
-        const activity = authorActivity[author.id];
-        const name = author.is_agent
-          ? author.agent_name || "AI Agent"
-          : author.display_name || "Member";
-
-        nodes.push({
-          id: `author-${author.id}`,
-          label: name,
-          size: Math.min(10, 2 + activity.count / 5),
-          group: author.is_agent ? "agent" : "user",
-        });
-
-        // Edge from author to each channel they participated in
-        activity.channels.forEach((chId) => {
-          const weight = Math.min(
-            1,
-            messages.filter(
-              (m) => m.author_id === author.id && m.channel_id === chId
-            ).length / 20
-          );
-          edges.push({
-            source: `author-${author.id}`,
-            target: `ch-${chId}`,
-            weight: Math.max(0.2, weight),
-          });
-        });
-      });
-    }
   }
 
-  // Extract simple topic nodes from frequently mentioned words
-  const wordFreq: Record<string, number> = {};
-  const stopWords = new Set([
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "dare", "ought",
-    "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
-    "as", "into", "about", "like", "through", "after", "over", "between",
-    "out", "against", "during", "without", "before", "under", "around",
-    "among", "i", "me", "my", "we", "our", "you", "your", "he", "she",
-    "it", "they", "them", "their", "this", "that", "these", "those",
-    "and", "but", "or", "nor", "not", "so", "very", "just", "also",
-    "than", "then", "now", "here", "there", "when", "where", "how",
-    "all", "each", "every", "both", "few", "more", "most", "other",
-    "some", "such", "no", "only", "same", "too", "what", "which", "who",
-  ]);
+  // Author nodes + edges from author -> each channel they posted in
+  const authorActivity = new Map<string, { channels: Set<string>; count: number }>();
+  for (const m of messages || []) {
+    if (!m.author_id) continue;
+    let a = authorActivity.get(m.author_id);
+    if (!a) {
+      a = { channels: new Set(), count: 0 };
+      authorActivity.set(m.author_id, a);
+    }
+    a.count += 1;
+    a.channels.add(m.channel_id);
+  }
 
-  messages.forEach((m) => {
-    if (!m.body) return;
-    const words = m.body
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .split(/\s+/)
-      .filter((w: string) => w.length > 3 && !stopWords.has(w));
+  if (authorActivity.size > 0) {
+    const authorIds = Array.from(authorActivity.keys());
+    const { data: authors } = await supabase
+      .from("authors")
+      .select("id, kind, agent_name, member_id")
+      .in("id", authorIds);
 
-    words.forEach((word: string) => {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
-    });
-  });
+    // Resolve member handles for humans
+    const memberIds = (authors || [])
+      .filter((a) => a.kind === "human" && a.member_id)
+      .map((a) => a.member_id as string);
+    let memberMap: Record<string, string> = {};
+    if (memberIds.length > 0) {
+      const { data: members } = await supabase
+        .from("members")
+        .select("id, handle")
+        .in("id", memberIds);
+      memberMap = Object.fromEntries((members || []).map((m) => [m.id, m.handle]));
+    }
 
-  // Top topic words as nodes
-  const topicWords = Object.entries(wordFreq)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+    for (const author of authors || []) {
+      const activity = authorActivity.get(author.id);
+      if (!activity) continue;
+      const label =
+        author.kind === "agent"
+          ? author.agent_name || "agent"
+          : memberMap[author.member_id || ""] || "member";
 
-  topicWords.forEach(([word, freq]) => {
-    nodes.push({
-      id: `topic-${word}`,
-      label: word,
-      size: Math.min(8, 2 + freq / 5),
-      group: "topic",
-    });
+      nodes.push({
+        id: `a-${author.id}`,
+        label,
+        size: Math.min(10, 2 + activity.count / 2),
+        group: author.kind === "agent" ? "agent" : "user",
+      });
 
-    // Connect topic to channels where it appears most
-    channels.forEach((ch) => {
-      const chMessages = messages.filter((m) => m.channel_id === ch.id);
-      const topicCount = chMessages.filter((m) =>
-        m.body?.toLowerCase().includes(word)
-      ).length;
-      if (topicCount > 0) {
+      for (const chId of activity.channels) {
         edges.push({
-          source: `topic-${word}`,
-          target: `ch-${ch.id}`,
-          weight: Math.min(1, topicCount / 10),
+          source: `a-${author.id}`,
+          target: `ch-${chId}`,
+          weight: 0.5,
         });
       }
-    });
-  });
+    }
+  }
 
   return Response.json({ nodes, edges });
 }

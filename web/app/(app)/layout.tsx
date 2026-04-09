@@ -5,29 +5,47 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import * as Icons from "lucide-react";
 import {
   MessageSquare,
   Brain,
   FileText,
   Search,
-  Rss,
   LogOut,
   Hash,
+  LayoutGrid,
+  Scale,
+  Lightbulb,
 } from "lucide-react";
 
-interface Channel {
+interface Lane {
   id: string;
   slug: string;
   name: string;
+  icon: string | null;
+  color: string | null;
+  sort_order: number | null;
 }
 
 const NAV_ITEMS = [
   { href: "/chat/general", label: "Chat", icon: MessageSquare },
+  { href: "/lanes", label: "Lanes", icon: LayoutGrid },
   { href: "/mindmap", label: "Mind Map", icon: Brain },
   { href: "/docs", label: "Docs", icon: FileText },
   { href: "/search", label: "Search", icon: Search },
-  { href: "/feeds", label: "Feeds", icon: Rss },
+  { href: "/build-vs-raid", label: "Build vs Raid", icon: Scale },
+  { href: "/requests", label: "Feature Requests", icon: Lightbulb },
 ];
+
+// Tailwind needs full class strings at build time, so we map lane colors -> classes.
+const LANE_TEXT: Record<string, string> = {
+  purple: "text-purple-400",
+  amber: "text-amber-400",
+  blue: "text-blue-400",
+  emerald: "text-emerald-400",
+  sky: "text-sky-400",
+  rose: "text-rose-400",
+};
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -35,7 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createBrowserClient();
 
   const [user, setUser] = useState<User | null>(null);
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [lanes, setLanes] = useState<Lane[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,13 +69,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       setUser(currentUser);
 
-      // Fetch channels
-      const { data: channelData } = await supabase
-        .from("channels")
-        .select("id, slug, name")
-        .order("name");
+      // Fetch lanes ordered by sort_order
+      const { data: laneData } = await supabase
+        .from("lanes")
+        .select("id, slug, name, icon, color, sort_order")
+        .order("sort_order", { ascending: true });
 
-      if (channelData) setChannels(channelData);
+      if (laneData) setLanes(laneData as Lane[]);
       setLoading(false);
     }
 
@@ -102,7 +120,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive =
-              pathname === href || pathname.startsWith(href.split("/").slice(0, -1).join("/") + "/");
+              pathname === href ||
+              (href !== "/chat/general" && pathname.startsWith(href));
             return (
               <Link
                 key={href}
@@ -119,32 +138,58 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Channel list */}
-          {channels.length > 0 && (
+          {/* Lanes */}
+          {lanes.length > 0 && (
             <>
               <div className="mt-6 mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Channels
+                Lanes
               </div>
-              {channels.map((channel) => {
-                const channelPath = `/chat/${channel.slug}`;
-                const isActive = pathname === channelPath;
+              {lanes.map((lane) => {
+                const href = `/chat/${lane.slug}`;
+                const isActive = pathname === href;
+                const LaneIcon =
+                  (lane.icon &&
+                    (Icons as unknown as Record<string, Icons.LucideIcon>)[
+                      lane.icon
+                    ]) ||
+                  Icons.Hash;
+                const colorClass =
+                  (lane.color && LANE_TEXT[lane.color]) || "text-gray-400";
                 return (
                   <Link
-                    key={channel.id}
-                    href={channelPath}
+                    key={lane.id}
+                    href={href}
                     className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                       isActive
                         ? "bg-purple-600/15 text-purple-300"
                         : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                     }`}
                   >
-                    <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
-                    {channel.name}
+                    <LaneIcon
+                      className={`h-4 w-4 flex-shrink-0 ${colorClass}`}
+                    />
+                    <span className="truncate">{lane.name}</span>
                   </Link>
                 );
               })}
             </>
           )}
+
+          {/* Catch-all */}
+          <div className="mt-6 mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Catch-all
+          </div>
+          <Link
+            href="/chat/general"
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+              pathname === "/chat/general"
+                ? "bg-purple-600/15 text-purple-300"
+                : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+            }`}
+          >
+            <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+            general
+          </Link>
         </nav>
 
         {/* User info & sign out */}
