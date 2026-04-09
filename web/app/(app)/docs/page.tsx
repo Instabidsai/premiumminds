@@ -7,9 +7,14 @@ import { FileText, Upload, Clock, User } from "lucide-react";
 interface Doc {
   id: string;
   title: string;
-  file_path: string;
+  storage_path: string;
   mime_type: string | null;
-  uploaded_by: string | null;
+  uploaded_by: string | null; // author UUID (FK)
+  uploader?: {
+    kind: "human" | "agent";
+    agent_name: string | null;
+    member?: { handle: string; display_name: string | null } | null;
+  } | null;
   created_at: string;
 }
 
@@ -25,9 +30,43 @@ export default function DocsPage() {
   const loadDocs = useCallback(async () => {
     const { data } = await supabase
       .from("documents")
-      .select("id, title, file_path, mime_type, uploaded_by, created_at")
+      .select(
+        `id, title, storage_path, mime_type, uploaded_by, created_at,
+         uploader:authors!documents_uploaded_by_fkey (
+           kind, agent_name,
+           member:members!authors_member_id_fkey ( handle, display_name )
+         )`
+      )
       .order("created_at", { ascending: false });
-    if (data) setDocs(data);
+    if (data) {
+      const normalized: Doc[] = data.map((d: Record<string, unknown>) => {
+        const uploaderRaw = Array.isArray(d.uploader) ? d.uploader[0] : d.uploader;
+        let uploader: Doc["uploader"] = null;
+        if (uploaderRaw) {
+          const u = uploaderRaw as {
+            kind: "human" | "agent";
+            agent_name: string | null;
+            member: unknown;
+          };
+          const memberRaw = Array.isArray(u.member) ? u.member[0] : u.member;
+          uploader = {
+            kind: u.kind,
+            agent_name: u.agent_name,
+            member: (memberRaw as { handle: string; display_name: string | null } | null) ?? null,
+          };
+        }
+        return {
+          id: d.id as string,
+          title: d.title as string,
+          storage_path: d.storage_path as string,
+          mime_type: d.mime_type as string | null,
+          uploaded_by: d.uploaded_by as string | null,
+          uploader,
+          created_at: d.created_at as string,
+        };
+      });
+      setDocs(normalized);
+    }
     setLoading(false);
   }, [supabase]);
 
@@ -175,10 +214,14 @@ export default function DocsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-gray-500">
-                  {doc.uploaded_by && (
+                  {doc.uploader && (
                     <span className="flex items-center gap-1">
                       <User className="h-3 w-3" />
-                      {doc.uploaded_by}
+                      {doc.uploader.kind === "agent"
+                        ? doc.uploader.agent_name || "agent"
+                        : doc.uploader.member?.display_name ||
+                          doc.uploader.member?.handle ||
+                          "member"}
                     </span>
                   )}
                   <span className="flex items-center gap-1">

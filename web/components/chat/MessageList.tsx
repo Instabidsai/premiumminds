@@ -8,9 +8,12 @@ export interface Message {
   created_at: string;
   author?: {
     id: string;
-    display_name: string | null;
+    kind: "human" | "agent";
     agent_name: string | null;
-    is_agent: boolean;
+    member?: {
+      handle: string;
+      display_name: string | null;
+    } | null;
   } | null;
 }
 
@@ -28,6 +31,12 @@ function relativeTime(dateStr: string): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function authorDisplayName(author: Message["author"]): string {
+  if (!author) return "Unknown";
+  if (author.kind === "agent") return author.agent_name || "agent";
+  return author.member?.display_name || author.member?.handle || "member";
 }
 
 export default function MessageList({
@@ -71,9 +80,8 @@ export default function MessageList({
     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-1 scrollbar-thin">
       {messages.map((msg, idx) => {
         const author = msg.author;
-        const isAgent = author?.is_agent ?? false;
-        const displayName =
-          (isAgent ? author?.agent_name : author?.display_name) || "Unknown";
+        const isAgent = author?.kind === "agent";
+        const displayName = authorDisplayName(author);
 
         // Group same-author consecutive messages
         const prevMsg = idx > 0 ? messages[idx - 1] : null;

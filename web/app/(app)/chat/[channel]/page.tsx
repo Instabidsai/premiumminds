@@ -14,6 +14,53 @@ interface ChannelRow {
   description: string | null;
 }
 
+interface RawMessageRow {
+  id: string;
+  body: string;
+  created_at: string;
+  author:
+    | {
+        id: string;
+        kind: "human" | "agent";
+        agent_name: string | null;
+        member:
+          | { handle: string; display_name: string | null }
+          | { handle: string; display_name: string | null }[]
+          | null;
+      }
+    | {
+        id: string;
+        kind: "human" | "agent";
+        agent_name: string | null;
+        member:
+          | { handle: string; display_name: string | null }
+          | { handle: string; display_name: string | null }[]
+          | null;
+      }[]
+    | null;
+}
+
+function normalizeMessage(raw: RawMessageRow): Message {
+  const authorRaw = Array.isArray(raw.author) ? raw.author[0] ?? null : raw.author;
+  let member: { handle: string; display_name: string | null } | null = null;
+  if (authorRaw?.member) {
+    member = Array.isArray(authorRaw.member) ? authorRaw.member[0] ?? null : authorRaw.member;
+  }
+  return {
+    id: raw.id,
+    body: raw.body,
+    created_at: raw.created_at,
+    author: authorRaw
+      ? {
+          id: authorRaw.id,
+          kind: authorRaw.kind,
+          agent_name: authorRaw.agent_name,
+          member,
+        }
+      : null,
+  };
+}
+
 export default function ChatPage() {
   const params = useParams<{ channel: string }>();
   const channelSlug = params.channel;
@@ -23,7 +70,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   // Load channel + messages
   useEffect(() => {
@@ -32,11 +79,11 @@ export default function ChatPage() {
     async function load() {
       setLoading(true);
 
-      // Get current user
+      // Get current auth user
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
+      if (user) setAuthUserId(user.id);
 
       // Get channel by slug
       const { data: ch } = await supabase
@@ -56,14 +103,15 @@ export default function ChatPage() {
 
       setChannel(ch);
 
-      // Fetch messages with author info
+      // Fetch messages with author + member joined
       const { data: msgs } = await supabase
         .from("messages")
         .select(
           `
           id, body, created_at,
           author:authors!messages_author_id_fkey (
-            id, display_name, agent_name, is_agent
+            id, kind, agent_name,
+            member:members!authors_member_id_fkey ( handle, display_name )
           )
         `
         )
@@ -74,12 +122,7 @@ export default function ChatPage() {
       if (!mounted) return;
 
       if (msgs) {
-        // Normalize author from array to single object
-        const normalized: Message[] = msgs.map((m) => ({
-          ...m,
-          author: Array.isArray(m.author) ? m.author[0] ?? null : m.author,
-        }));
-        setMessages(normalized);
+        setMessages((msgs as unknown as RawMessageRow[]).map(normalizeMessage));
       }
       setLoading(false);
     }
@@ -112,22 +155,38 @@ export default function ChatPage() {
             author_id: string;
           };
 
-          // Fetch author info for the new message
+          // Fetch author + member for the new message
           const { data: author } = await supabase
             .from("authors")
-            .select("id, display_name, agent_name, is_agent")
+            .select(
+              `
+              id, kind, agent_name,
+              member:members!authors_member_id_fkey ( handle, display_name )
+            `
+            )
             .eq("id", newMsg.author_id)
             .single();
+
+          let member: { handle: string; display_name: string | null } | null = null;
+          if (author?.member) {
+            member = Array.isArray(author.member) ? author.member[0] ?? null : author.member;
+          }
 
           const fullMsg: Message = {
             id: newMsg.id,
             body: newMsg.body,
             created_at: newMsg.created_at,
-            author: author ?? null,
+            author: author
+              ? {
+                  id: author.id,
+                  kind: author.kind as "human" | "agent",
+                  agent_name: author.agent_name,
+                  member,
+                }
+              : null,
           };
 
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m.id === fullMsg.id)) return prev;
             return [...prev, fullMsg];
           });
@@ -143,59 +202,89 @@ export default function ChatPage() {
   // Send message
   const handleSend = useCallback(
     async (text: string) => {
-      if (!channel || !userId) return;
+      if (!channel || !authUserId) return;
       setSending(true);
 
       try {
-        // Find or create the author record for this user in this channel's community
-        let { data: author } = await supabase
-          .from("authors")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("is_agent", false)
-          .limit(1)
-          .single();
+        // 1. Find the member row for this auth user
+        let { data: member } = await supabase
+          .from("members")
+          .select("id, handle")
+          .eq("auth_user_id", authUserId)
+          .maybeSingle();
 
-        if (!author) {
-          // Get user email for display name
+        // Create member if missing (first-time user)
+        if (!member) {
           const {
             data: { user },
           } = await supabase.auth.getUser();
-          const displayName =
-            user?.user_metadata?.display_name ||
+          const handle =
+            user?.user_metadata?.handle ||
             user?.email?.split("@")[0] ||
-            "Anonymous";
+            `user-${authUserId.slice(0, 8)}`;
+          const displayName =
+            user?.user_metadata?.display_name || user?.email?.split("@")[0] || handle;
 
-          const { data: newAuthor } = await supabase
+          const { data: newMember, error: memberErr } = await supabase
+            .from("members")
+            .insert({
+              auth_user_id: authUserId,
+              handle,
+              display_name: displayName,
+            })
+            .select("id, handle")
+            .single();
+
+          if (memberErr || !newMember) {
+            console.error("Failed to create member:", memberErr);
+            return;
+          }
+          member = newMember;
+        }
+
+        // 2. Find the human author for this member
+        let { data: author } = await supabase
+          .from("authors")
+          .select("id")
+          .eq("member_id", member.id)
+          .eq("kind", "human")
+          .maybeSingle();
+
+        // Create author if missing
+        if (!author) {
+          const { data: newAuthor, error: authorErr } = await supabase
             .from("authors")
             .insert({
-              user_id: userId,
-              display_name: displayName,
-              is_agent: false,
+              kind: "human",
+              member_id: member.id,
             })
             .select("id")
             .single();
 
+          if (authorErr || !newAuthor) {
+            console.error("Failed to create author:", authorErr);
+            return;
+          }
           author = newAuthor;
         }
 
-        if (!author) {
-          console.error("Failed to create/find author");
-          return;
-        }
-
-        await supabase.from("messages").insert({
+        // 3. Insert the message
+        const { error: msgErr } = await supabase.from("messages").insert({
           channel_id: channel.id,
           author_id: author.id,
           body: text,
         });
+
+        if (msgErr) {
+          console.error("Failed to send message:", msgErr);
+        }
       } catch (err) {
         console.error("Failed to send message:", err);
       } finally {
         setSending(false);
       }
     },
-    [channel, userId, supabase]
+    [channel, authUserId, supabase]
   );
 
   if (!loading && !channel) {
