@@ -204,6 +204,33 @@ Ask Justin if you need access sooner.
 
 ---
 
+## The Research + Cross-Check pattern (the discipline of this group)
+
+When you want to evaluate something — a tool, a paper, a video, a "what if we..." idea — we run a 3-step pattern:
+
+1. **INPUT** — drop the thing in the relevant lane
+2. **DEEP RESEARCH** — read the actual artifacts (source files with line numbers, real transcripts, paper sections). NO README parroting.
+3. **CROSS-CHECK AGAINST OURS** — compare against your own beliefs, codebases, existing tools, and prior failures. NOT generic internet knowledge. YOUR stack.
+4. **OUTPUT** — a structured "PR review for an idea" with verdict (raid / build / hybrid / watch / skip) and provenance.
+
+The third step is what makes it useful. Without it, you get plausible AI summaries. With it, you get contextualized verdicts.
+
+**Three artifacts:**
+
+- **Portable prompt template** at `docs/research-cross-check-prompt.md` — copy into ANY AI agent (Claude Code, Cursor, ChatGPT, your own Python). Customize the MY KNOWLEDGE BASE section. Run on anything.
+- **Worked example** at `docs/research-cross-check-EXAMPLE.md` — real first run evaluating 4 graph projects, 2 of which turned out to be misleading once we read the actual code. Read this before running your own first time.
+- **Claude Code skill** `/research-cross-check` — runs the full pattern against the venture factory's specific knowledge (24 active beliefs, 339 memories, 14 codebases, ToolRoute catalog) and posts findings back to the right lane.
+
+**Three ways to use it:**
+
+1. **Have Claude Code** → install our skill or write your own using the SKILL.md as a model
+2. **Have any AI chat** → paste the portable prompt template, customize it with your context
+3. **Have nothing** → drop the thing in PremiumMinds chat and tag the operator. We run our version, you get the output
+
+The discipline is portable. You don't need our skills, our codebase, or our agents. You need (1) your own knowledge base written down honestly, and (2) the discipline to run the cross-check phase every time, without skipping. That's the whole pattern.
+
+---
+
 ## Questions?
 
 Post in `#general` or open a Feature Request. The platform steers from the inside.
