@@ -424,7 +424,7 @@ export default function ChatPage() {
           className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${headerStyle.accent}`}
           aria-hidden
         />
-        <div className="flex items-center gap-4 px-6 py-4">
+        <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
           <div
             className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ring-1 ${headerStyle.iconBg} ${headerStyle.iconRing} ${headerStyle.glow}`}
           >

@@ -17,6 +17,8 @@ import {
   Scale,
   Lightbulb,
   Rss,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface Lane {
@@ -58,9 +60,14 @@ const LANE_DOT: Record<string, string> = {
   rose: "bg-rose-400",
 };
 
-// CSS-only placeholder for "unread activity" — tag a few lane slugs so the
-// dot renders without needing real tracking yet.
-const DEMO_UNREAD_SLUGS = new Set<string>(["builds", "research", "wins"]);
+// Demo unread indicators until real unread tracking is wired
+const DEMO_UNREAD_SLUGS = new Set<string>([]);
+
+interface UnreadRow {
+  channel_id: string;
+  channel_slug: string;
+  unread_count: number;
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -70,6 +77,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [lanes, setLanes] = useState<Lane[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [unreadBySlug, setUnreadBySlug] = useState<Record<string, number>>({});
+
+  // Close mobile nav when route changes
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll while mobile drawer is open
+  useEffect(() => {
+    if (mobileNavOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     async function init() {
@@ -96,6 +121,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     init();
   }, [supabase, router]);
+
+  // Poll unread counts every 30s while signed in.
+  // Also re-fetch when pathname changes so the sidebar updates right
+  // after a channel is marked read.
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+
+    async function fetchUnread() {
+      const { data, error } = await supabase.rpc("get_unread_counts");
+      if (cancelled) return;
+      if (error || !data) return;
+      const next: Record<string, number> = {};
+      for (const row of data as UnreadRow[]) {
+        if (row.channel_slug) {
+          next[row.channel_slug] = Number(row.unread_count) || 0;
+        }
+      }
+      setUnreadBySlug(next);
+    }
+
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [supabase, user, pathname]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -124,8 +178,55 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
-      {/* Sidebar */}
-      <aside className="flex w-64 flex-col border-r border-gray-800 bg-gray-900">
+      {/* Mobile top bar — hamburger + brand. Hidden on md+. */}
+      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-gray-800 bg-gray-900/95 px-3 backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open navigation"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-600/20 ring-1 ring-purple-500/30">
+            <Brain className="h-4 w-4 text-purple-400" />
+          </div>
+          <span className="text-sm font-bold tracking-tight">
+            <span className="text-purple-400">Premium</span>
+            <span className="text-gray-100">Minds</span>
+          </span>
+        </div>
+        {/* Right-side spacer to balance the hamburger button */}
+        <div className="h-11 w-11" aria-hidden />
+      </div>
+
+      {/* Mobile drawer backdrop */}
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+        />
+      )}
+
+      {/* Sidebar — fixed drawer on mobile, static column on md+ */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-800 bg-gray-900 transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 ${
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        {/* Mobile close button */}
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(false)}
+          aria-label="Close navigation"
+          className="absolute right-2 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-100 md:hidden"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
         {/* Brand header */}
         <div className="flex items-center gap-2.5 border-b border-gray-800 px-5 py-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600/20 ring-1 ring-purple-500/30">
@@ -153,7 +254,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors md:py-2 ${
                   active
                     ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
                     : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
@@ -276,7 +377,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={handleSignOut}
               title="Sign out"
               aria-label="Sign out"
-              className="flex-shrink-0 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600 md:h-9 md:w-9"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -284,8 +385,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden">{children}</main>
+      {/* Main content. pt-14 on mobile makes room for the fixed top bar. */}
+      <main className="flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
     </div>
   );
 }

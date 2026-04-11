@@ -120,7 +120,7 @@ export default function Composer({
   const canSend = !isDisabled && text.trim().length > 0;
 
   return (
-    <div className="border-t border-gray-800 bg-gray-900/50 px-6 py-5 backdrop-blur">
+    <div className="border-t border-gray-800 bg-gray-900/50 px-3 py-3 backdrop-blur sm:px-6 sm:py-5">
       <div
         className={`group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/80 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-colors ring-1 ring-transparent focus-within:ring-1 ${accent.ring}`}
       >
@@ -131,7 +131,7 @@ export default function Composer({
         />
 
         {/* Input row */}
-        <div className="flex items-end gap-3 px-5 pt-4 pb-3">
+        <div className="flex items-end gap-2 px-3 pt-3 pb-2 sm:gap-3 sm:px-5 sm:pt-4 sm:pb-3">
           <div className="flex-1">
             <textarea
               ref={textareaRef}
@@ -154,7 +154,7 @@ export default function Composer({
             onClick={handleSend}
             disabled={!canSend}
             aria-label={sending ? "Sending…" : "Send message"}
-            className={`flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all ${
+            className={`flex h-11 min-w-[44px] flex-shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all sm:h-9 sm:min-w-0 ${
               canSend
                 ? "bg-purple-600 text-white shadow-[0_0_16px_-4px_rgba(168,85,247,0.6)] hover:bg-purple-500"
                 : "bg-gray-800 text-gray-500"
@@ -174,8 +174,8 @@ export default function Composer({
           </button>
         </div>
 
-        {/* Footer hint strip — shortcuts + hive indicator */}
-        <div className="flex items-center justify-between gap-4 border-t border-gray-800/60 bg-gray-950/40 px-5 py-2 text-[11px] text-gray-500">
+        {/* Footer hint strip — shortcuts + hive indicator. Hidden on small screens to save space. */}
+        <div className="hidden items-center justify-between gap-4 border-t border-gray-800/60 bg-gray-950/40 px-5 py-2 text-[11px] text-gray-500 sm:flex">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
               <kbd className="inline-flex h-4 items-center rounded border border-gray-700 bg-gray-900 px-1 font-sans text-[10px] text-gray-400">
