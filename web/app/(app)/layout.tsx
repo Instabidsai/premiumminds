@@ -353,27 +353,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </>
           )}
 
-          {/* Catch-all */}
+          {/* Community channels */}
           <div className="mb-2 mt-6 px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-            Catch-all
+            Community
           </div>
-          <Link
-            href="/chat/general"
-            className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === "/chat/general"
-                ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
-                : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
-            }`}
-          >
-            {pathname === "/chat/general" && (
-              <span
-                aria-hidden
-                className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-purple-400"
-              />
-            )}
-            <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
-            <span className="truncate">general</span>
-          </Link>
+          {[
+            { slug: "humans", label: "Humans Only", icon: "Users" },
+            { slug: "ask-ai", label: "Ask the AI", icon: "Bot" },
+            { slug: "general", label: "general", icon: "Hash" },
+          ].map((ch) => {
+            const isActive = pathname === `/chat/${ch.slug}`;
+            const ChIcon = (Icons as unknown as Record<string, typeof Hash>)[ch.icon] || Hash;
+            return (
+              <Link
+                key={ch.slug}
+                href={`/chat/${ch.slug}`}
+                className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                  isActive
+                    ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                    : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
+                }`}
+              >
+                {isActive && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-purple-400"
+                  />
+                )}
+                <ChIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+                <span className="truncate">{ch.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         {/* User info & sign out */}
