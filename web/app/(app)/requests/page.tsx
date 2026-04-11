@@ -10,6 +10,8 @@ import {
   Loader2,
   Inbox,
   MessageCircle,
+  User,
+  Clock,
 } from "lucide-react";
 
 type RequestStatus =
@@ -45,33 +47,49 @@ interface FeatureRequest {
   requester: MemberRef | null;
 }
 
-const STATUS_META: Record<
-  RequestStatus,
-  { label: string; className: string }
-> = {
+interface StatusMeta {
+  label: string;
+  badge: string;
+  accent: string;
+  dot: string;
+}
+
+const STATUS_META: Record<RequestStatus, StatusMeta> = {
   new: {
     label: "New",
-    className: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+    badge: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+    accent: "border-l-blue-500",
+    dot: "bg-blue-400",
   },
   considering: {
     label: "Considering",
-    className: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    accent: "border-l-amber-500",
+    dot: "bg-amber-400",
   },
   accepted: {
     label: "Accepted",
-    className: "bg-green-500/15 text-green-300 border-green-500/30",
+    badge: "bg-green-500/15 text-green-300 border-green-500/40",
+    accent: "border-l-green-500",
+    dot: "bg-green-400",
   },
   building: {
     label: "Building",
-    className: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+    badge: "bg-purple-500/15 text-purple-300 border-purple-500/40",
+    accent: "border-l-purple-500",
+    dot: "bg-purple-400",
   },
   shipped: {
     label: "Shipped",
-    className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    accent: "border-l-emerald-500",
+    dot: "bg-emerald-400",
   },
   rejected: {
     label: "Rejected",
-    className: "bg-gray-600/20 text-gray-400 border-gray-600/40",
+    badge: "bg-gray-600/20 text-gray-400 border-gray-600/40",
+    accent: "border-l-gray-600",
+    dot: "bg-gray-500",
   },
 };
 
@@ -93,10 +111,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max).trimEnd() + "...";
-}
+const BODY_PREVIEW_LEN = 240;
 
 export default function RequestsPage() {
   const supabase = createBrowserClient();
@@ -108,6 +123,8 @@ export default function RequestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [upvoting, setUpvoting] = useState<string | null>(null);
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Form state
   const [title, setTitle] = useState("");
@@ -162,7 +179,7 @@ export default function RequestsPage() {
           id: row.id,
           title: row.title,
           body: row.body,
-          status: row.status as RequestStatus,
+          status: (row.status as RequestStatus) ?? "new",
           upvotes: row.upvotes ?? 0,
           response: row.response,
           created_at: row.created_at,
@@ -276,36 +293,70 @@ export default function RequestsPage() {
   }
 
   async function handleUpvote(id: string, current: number) {
+    if (votedIds.has(id) || upvoting === id) return;
+
+    // Optimistic update
     setUpvoting(id);
+    setVotedIds((prev) => new Set(prev).add(id));
+    setRequests((prev) =>
+      prev
+        .map((r) => (r.id === id ? { ...r, upvotes: r.upvotes + 1 } : r))
+        .sort((a, b) => {
+          if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+          return (
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime()
+          );
+        })
+    );
+
     const { error: updErr } = await supabase
       .from("feature_requests")
       .update({ upvotes: current + 1 })
       .eq("id", id);
-    if (!updErr) {
+
+    if (updErr) {
+      // Rollback
+      setVotedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setRequests((prev) =>
-        prev
-          .map((r) => (r.id === id ? { ...r, upvotes: r.upvotes + 1 } : r))
-          .sort((a, b) => {
-            if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
-            return (
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-            );
-          })
+        prev.map((r) => (r.id === id ? { ...r, upvotes: r.upvotes - 1 } : r))
       );
     }
     setUpvoting(null);
   }
 
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedLanePreview = lanes.find((l) => l.id === laneId) || null;
+
   return (
     <div className="h-full overflow-y-auto bg-gray-950">
       <div className="mx-auto max-w-4xl px-6 py-10">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Lightbulb className="h-6 w-6 text-amber-400" />
-            <h1 className="text-2xl font-bold text-gray-100">
-              Feature Requests
-            </h1>
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10">
+              <Lightbulb className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-100">
+                Feature Requests
+              </h1>
+              <p className="mt-1 text-sm text-gray-400">
+                Ideas from the group. Upvote the ones that matter.
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -313,7 +364,7 @@ export default function RequestsPage() {
               setShowForm((v) => !v);
               if (showForm) resetForm();
             }}
-            className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500"
+            className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm shadow-purple-900/50 transition-colors hover:bg-purple-500"
           >
             {showForm ? (
               <>
@@ -327,19 +378,26 @@ export default function RequestsPage() {
           </button>
         </div>
 
-        <p className="mb-6 text-sm text-gray-400">
-          Ideas from the group. Upvote the ones that matter.
-        </p>
-
+        {/* Form */}
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-6"
+            className="mb-8 overflow-hidden rounded-xl border border-gray-800 bg-gray-900 shadow-lg"
           >
-            <div className="space-y-4">
+            <div className="border-b border-gray-800 bg-gray-900/50 px-6 py-4">
+              <h2 className="text-sm font-semibold text-gray-200">
+                New request
+              </h2>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Short title, clear body. Tell us what you want and why.
+              </p>
+            </div>
+
+            <div className="space-y-5 p-6">
+              {/* Title */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Title *
+                  Title <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -347,40 +405,72 @@ export default function RequestsPage() {
                   onChange={(e) => setTitle(e.target.value)}
                   required
                   placeholder="Short, specific ask"
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                  maxLength={120}
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
                 />
+                <div className="mt-1 flex justify-between text-[11px] text-gray-600">
+                  <span>One sentence. Actionable.</span>
+                  <span>{title.length}/120</span>
+                </div>
               </div>
 
+              {/* Body */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Body * <span className="text-gray-600">(markdown OK)</span>
+                  Body <span className="text-red-400">*</span>{" "}
+                  <span className="ml-1 font-normal text-gray-600">
+                    (markdown OK)
+                  </span>
                 </label>
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   required
-                  rows={5}
-                  placeholder="What should this do, and why?"
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                  rows={6}
+                  placeholder="What should this do, and why? What's the outcome?"
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
                 />
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Include the use case. Agents and humans will read this.
+                </p>
               </div>
 
+              {/* Lane */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Lane (optional)
+                  Lane{" "}
+                  <span className="ml-1 font-normal text-gray-600">
+                    (optional)
+                  </span>
                 </label>
-                <select
-                  value={laneId}
-                  onChange={(e) => setLaneId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">— no lane —</option>
-                  {lanes.map((lane) => (
-                    <option key={lane.id} value={lane.id}>
-                      {lane.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={laneId}
+                    onChange={(e) => setLaneId(e.target.value)}
+                    className="rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">— no lane —</option>
+                    {lanes.map((lane) => (
+                      <option key={lane.id} value={lane.id}>
+                        {lane.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedLanePreview && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                        (selectedLanePreview.color &&
+                          LANE_CHIP[selectedLanePreview.color]) ||
+                        "bg-gray-800 text-gray-300 border-gray-700"
+                      }`}
+                    >
+                      {selectedLanePreview.name}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Which workstream does this belong to?
+                </p>
               </div>
 
               {error && (
@@ -389,22 +479,42 @@ export default function RequestsPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 border-t border-gray-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="rounded-lg border border-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-gray-700 hover:text-gray-100"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {submitting && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  {submitting ? "Submitting..." : "Submit Request"}
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {submitting ? "Submitting..." : "Submit request"}
                 </button>
               </div>
             </div>
           </form>
         )}
 
+        {/* Count row */}
+        {!loading && requests.length > 0 && (
+          <div className="mb-4 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              {requests.length}{" "}
+              {requests.length === 1 ? "request" : "requests"} · sorted by
+              votes
+            </span>
+          </div>
+        )}
+
+        {/* List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3">
@@ -415,12 +525,26 @@ export default function RequestsPage() {
             </div>
           </div>
         ) : requests.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-800 py-20 text-gray-400">
-            <Inbox className="h-10 w-10 text-gray-600" />
-            <p className="text-sm">No feature requests yet.</p>
-            <p className="text-xs text-gray-600">
-              Be the first to ask for something.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-gray-800 bg-gray-900/30 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-gray-800 bg-gray-900">
+              <Inbox className="h-6 w-6 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-300">
+                No feature requests yet
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Be the first to ask for something. The group will upvote the
+                ideas that land.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:border-purple-500/50 hover:bg-purple-500/20"
+            >
+              <Plus className="h-3.5 w-3.5" /> Post the first request
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -433,29 +557,60 @@ export default function RequestsPage() {
                 req.requester?.display_name ||
                 req.requester?.handle ||
                 "unknown";
+              const voted = votedIds.has(req.id);
+              const isExpanded = expanded.has(req.id);
+              const needsTruncate = req.body.length > BODY_PREVIEW_LEN;
+              const displayBody =
+                needsTruncate && !isExpanded
+                  ? req.body.slice(0, BODY_PREVIEW_LEN).trimEnd() + "..."
+                  : req.body;
+
               return (
                 <article
                   key={req.id}
-                  className="rounded-xl border border-gray-800 bg-gray-900 p-5 transition-colors hover:border-gray-700"
+                  className={`overflow-hidden rounded-xl border border-l-4 border-gray-800 bg-gray-900 shadow-sm transition-all hover:border-gray-700 ${statusMeta.accent}`}
                 >
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 p-5">
+                    {/* Upvote button — left rail */}
                     <button
                       type="button"
                       onClick={() => handleUpvote(req.id, req.upvotes)}
-                      disabled={upvoting === req.id}
-                      className="flex h-14 w-12 flex-shrink-0 flex-col items-center justify-center rounded-lg border border-gray-800 bg-gray-950 text-gray-400 transition-colors hover:border-purple-500/50 hover:text-purple-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={upvoting === req.id || voted}
+                      aria-label={
+                        voted
+                          ? `Voted (${req.upvotes})`
+                          : `Upvote (${req.upvotes})`
+                      }
+                      className={`group flex h-16 w-14 flex-shrink-0 flex-col items-center justify-center rounded-lg border transition-all active:scale-95 ${
+                        voted
+                          ? "border-purple-500/50 bg-purple-500/15 text-purple-300"
+                          : "border-gray-800 bg-gray-950 text-gray-400 hover:-translate-y-0.5 hover:border-purple-500/50 hover:bg-purple-500/5 hover:text-purple-300"
+                      } disabled:cursor-not-allowed disabled:opacity-80`}
                     >
-                      <ChevronUp className="h-4 w-4" />
-                      <span className="text-sm font-semibold">
+                      {upvoting === req.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ChevronUp
+                          className={`h-4 w-4 transition-transform ${
+                            voted ? "" : "group-hover:-translate-y-0.5"
+                          }`}
+                        />
+                      )}
+                      <span className="mt-0.5 text-sm font-bold tabular-nums">
                         {req.upvotes}
                       </span>
                     </button>
 
+                    {/* Body */}
                     <div className="min-w-0 flex-1">
+                      {/* Status + lane badges */}
                       <div className="mb-2 flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${statusMeta.className}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${statusMeta.badge}`}
                         >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${statusMeta.dot}`}
+                          />
                           {statusMeta.label}
                         </span>
                         {req.lane && (
@@ -467,25 +622,44 @@ export default function RequestsPage() {
                         )}
                       </div>
 
-                      <h3 className="text-base font-semibold text-gray-100">
+                      {/* Title */}
+                      <h3 className="text-base font-semibold leading-snug text-gray-100">
                         {req.title}
                       </h3>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-400">
-                        {truncate(req.body, 200)}
-                      </p>
 
-                      <div className="mt-3 flex items-center gap-3 text-xs text-gray-500">
-                        <span>by @{requester}</span>
-                        <span>{formatDate(req.created_at)}</span>
+                      {/* Body */}
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-400">
+                        {displayBody}
+                      </p>
+                      {needsTruncate && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(req.id)}
+                          className="mt-1 text-[11px] font-medium text-purple-400 hover:text-purple-300"
+                        >
+                          {isExpanded ? "Show less" : "Show more"}
+                        </button>
+                      )}
+
+                      {/* Meta row */}
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />@{requester}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(req.created_at)}
+                        </span>
                       </div>
 
+                      {/* Response */}
                       {req.response && (
                         <div className="mt-4 rounded-lg border border-purple-500/30 bg-purple-500/5 p-3">
                           <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300">
                             <MessageCircle className="h-3 w-3" />
-                            Response
+                            Response from the team
                           </div>
-                          <p className="whitespace-pre-wrap text-sm text-gray-300">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
                             {req.response}
                           </p>
                         </div>

@@ -9,9 +9,16 @@ import {
   ExternalLink,
   Loader2,
   Inbox,
+  Target,
+  Package,
+  Wrench,
+  Sparkles,
+  Tag,
+  User,
+  Clock,
 } from "lucide-react";
 
-type Verdict = "raid" | "build" | "hybrid" | "watch" | "undecided";
+type Verdict = "raid" | "build" | "hybrid" | "watch" | "skip" | "undecided";
 
 interface AuthorInfo {
   id: string;
@@ -35,31 +42,67 @@ interface BuildVsRaidRow {
   author: AuthorInfo | null;
 }
 
-const VERDICT_META: Record<
-  Verdict,
-  { label: string; className: string }
-> = {
+interface VerdictMeta {
+  label: string;
+  badge: string;
+  accent: string;
+  dot: string;
+  description: string;
+}
+
+const VERDICT_META: Record<Verdict, VerdictMeta> = {
   raid: {
     label: "Raid",
-    className: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+    badge: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+    accent: "border-l-blue-500",
+    dot: "bg-blue-400",
+    description: "Use the best-in-class tool instead of building",
   },
   build: {
     label: "Build",
-    className: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+    badge: "bg-purple-500/15 text-purple-300 border-purple-500/40",
+    accent: "border-l-purple-500",
+    dot: "bg-purple-400",
+    description: "Our version is worth the investment",
   },
   hybrid: {
     label: "Hybrid",
-    className: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    accent: "border-l-amber-500",
+    dot: "bg-amber-400",
+    description: "Raid the core, build the thin wrapper",
   },
   watch: {
     label: "Watch",
-    className: "bg-gray-600/20 text-gray-300 border-gray-600/40",
+    badge: "bg-gray-500/20 text-gray-300 border-gray-500/40",
+    accent: "border-l-gray-500",
+    dot: "bg-gray-400",
+    description: "Not urgent, revisit later",
+  },
+  skip: {
+    label: "Skip",
+    badge: "bg-red-500/15 text-red-300 border-red-500/40",
+    accent: "border-l-red-500",
+    dot: "bg-red-400",
+    description: "Not worth doing at all",
   },
   undecided: {
     label: "Undecided",
-    className: "bg-gray-800 text-gray-400 border-gray-700",
+    badge: "bg-gray-800 text-gray-400 border-gray-700",
+    accent: "border-l-gray-700",
+    dot: "bg-gray-500",
+    description: "Still working through it",
   },
 };
+
+const VERDICT_ORDER: Verdict[] = [
+  "undecided",
+  "raid",
+  "build",
+  "hybrid",
+  "watch",
+  "skip",
+];
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -155,7 +198,7 @@ export default function BuildVsRaidPage() {
         raid_candidate_url: row.raid_candidate_url,
         current_approach: row.current_approach,
         unique_wins: row.unique_wins,
-        verdict: row.verdict as Verdict,
+        verdict: (row.verdict as Verdict) ?? "undecided",
         beliefs_touched: row.beliefs_touched,
         created_at: row.created_at,
         author,
@@ -187,7 +230,6 @@ export default function BuildVsRaidPage() {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Find the member row for this auth user
     const { data: member } = await supabase
       .from("members")
       .select("id, handle, display_name")
@@ -195,7 +237,6 @@ export default function BuildVsRaidPage() {
       .maybeSingle();
 
     if (!member) {
-      // Create a member row
       const fallbackHandle =
         (user.email?.split("@")[0] || `user-${user.id.slice(0, 8)}`).replace(
           /[^a-z0-9_-]/gi,
@@ -220,7 +261,6 @@ export default function BuildVsRaidPage() {
       return newAuthor?.id ?? null;
     }
 
-    // Find or create an author for this member
     const { data: existingAuthor } = await supabase
       .from("authors")
       .select("id")
@@ -255,7 +295,6 @@ export default function BuildVsRaidPage() {
         return;
       }
 
-      // Look up the build-vs-raid channel
       const { data: channel } = await supabase
         .from("channels")
         .select("id")
@@ -273,7 +312,6 @@ export default function BuildVsRaidPage() {
         .map((b) => b.trim())
         .filter((b) => b.length > 0);
 
-      // Build the companion markdown message
       const lines: string[] = [];
       lines.push(`**Build vs Raid — ${VERDICT_META[verdict].label}**`);
       lines.push("");
@@ -295,7 +333,6 @@ export default function BuildVsRaidPage() {
       }
       const body = lines.join("\n");
 
-      // Insert the companion message first so we can reference its id.
       const { data: msg, error: msgErr } = await supabase
         .from("messages")
         .insert({
@@ -312,7 +349,6 @@ export default function BuildVsRaidPage() {
         return;
       }
 
-      // Insert the structured row
       const { error: insertErr } = await supabase.from("build_vs_raid").insert({
         message_id: msg.id,
         posted_by: authorId,
@@ -345,10 +381,20 @@ export default function BuildVsRaidPage() {
   return (
     <div className="h-full overflow-y-auto bg-gray-950">
       <div className="mx-auto max-w-4xl px-6 py-10">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Scale className="h-6 w-6 text-amber-400" />
-            <h1 className="text-2xl font-bold text-gray-100">Build vs Raid</h1>
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10">
+              <Scale className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-100">
+                Build vs Raid
+              </h1>
+              <p className="mt-1 text-sm text-gray-400">
+                Custom stack vs best-in-class. Every audit lives here.
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -356,7 +402,7 @@ export default function BuildVsRaidPage() {
               setShowForm((v) => !v);
               if (showForm) resetForm();
             }}
-            className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500"
+            className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm shadow-purple-900/50 transition-colors hover:bg-purple-500"
           >
             {showForm ? (
               <>
@@ -370,19 +416,30 @@ export default function BuildVsRaidPage() {
           </button>
         </div>
 
-        <p className="mb-6 text-sm text-gray-400">
-          Custom stack vs best-in-class. Every audit lives here.
-        </p>
-
+        {/* Form */}
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-6"
+            className="mb-8 overflow-hidden rounded-xl border border-gray-800 bg-gray-900 shadow-lg"
           >
-            <div className="space-y-4">
+            <div className="border-b border-gray-800 bg-gray-900/50 px-6 py-4">
+              <h2 className="text-sm font-semibold text-gray-200">
+                New audit
+              </h2>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Walk through the 5 questions. Pick a verdict when you&apos;re
+                confident.
+              </p>
+            </div>
+
+            <div className="space-y-6 p-6">
+              {/* 1. Problem */}
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Problem *
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Target className="h-3.5 w-3.5 text-gray-500" />
+                  <span>
+                    Problem <span className="text-red-400">*</span>
+                  </span>
                 </label>
                 <textarea
                   value={problem}
@@ -390,39 +447,55 @@ export default function BuildVsRaidPage() {
                   rows={2}
                   required
                   placeholder="What are we trying to solve?"
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
                 />
+                <p className="mt-1 text-[11px] text-gray-600">
+                  One sentence. Strip the jargon.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Raid candidate
-                  </label>
-                  <input
-                    type="text"
-                    value={raidCandidate}
-                    onChange={(e) => setRaidCandidate(e.target.value)}
-                    placeholder="e.g. Linear, Supabase, Clerk"
-                    className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
-                  />
+              {/* 2. Candidate (grouped) */}
+              <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-4">
+                <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Package className="h-3.5 w-3.5 text-gray-500" />
+                  Raid candidate
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Raid candidate URL
-                  </label>
-                  <input
-                    type="url"
-                    value={raidCandidateUrl}
-                    onChange={(e) => setRaidCandidateUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
-                  />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.3fr]">
+                  <div>
+                    <label className="mb-1 block text-[11px] text-gray-500">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={raidCandidate}
+                      onChange={(e) => setRaidCandidate(e.target.value)}
+                      placeholder="e.g. Linear, Supabase, Clerk"
+                      className="w-full rounded-md border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-gray-500">
+                      URL
+                    </label>
+                    <input
+                      type="url"
+                      value={raidCandidateUrl}
+                      onChange={(e) => setRaidCandidateUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full rounded-md border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
+                <p className="mt-2 text-[11px] text-gray-600">
+                  Best-in-class tool you&apos;d rip off the shelf. Skip if
+                  there&apos;s no contender.
+                </p>
               </div>
 
+              {/* 3. Current approach */}
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Wrench className="h-3.5 w-3.5 text-gray-500" />
                   Current approach
                 </label>
                 <textarea
@@ -430,52 +503,83 @@ export default function BuildVsRaidPage() {
                   onChange={(e) => setCurrentApproach(e.target.value)}
                   rows={2}
                   placeholder="How are we solving this today?"
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
                 />
               </div>
 
+              {/* 4. Unique wins */}
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Sparkles className="h-3.5 w-3.5 text-gray-500" />
                   Unique wins
                 </label>
                 <textarea
                   value={uniqueWins}
                   onChange={(e) => setUniqueWins(e.target.value)}
                   rows={2}
-                  placeholder="What does the raid candidate do better?"
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
+                  placeholder="What does the raid candidate do better than us?"
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
                 />
+                <p className="mt-1 text-[11px] text-gray-600">
+                  If the answer is &quot;nothing,&quot; that&apos;s a signal to
+                  build.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Verdict
-                  </label>
-                  <select
-                    value={verdict}
-                    onChange={(e) => setVerdict(e.target.value as Verdict)}
-                    className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="undecided">Undecided</option>
-                    <option value="raid">Raid</option>
-                    <option value="build">Build</option>
-                    <option value="hybrid">Hybrid</option>
-                    <option value="watch">Watch</option>
-                  </select>
+              {/* 5. Verdict — visual anchor */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Verdict
+                </label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  {VERDICT_ORDER.map((v) => {
+                    const meta = VERDICT_META[v];
+                    const active = verdict === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setVerdict(v)}
+                        className={`flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-all ${
+                          active
+                            ? `${meta.badge} ring-2 ring-offset-2 ring-offset-gray-900`
+                            : "border-gray-800 bg-gray-950 text-gray-400 hover:border-gray-700 hover:text-gray-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+                          />
+                          <span className="text-xs font-semibold uppercase tracking-wider">
+                            {meta.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Beliefs touched
-                  </label>
-                  <input
-                    type="text"
-                    value={beliefsInput}
-                    onChange={(e) => setBeliefsInput(e.target.value)}
-                    placeholder="comma, separated, list"
-                    className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
+                <p className="mt-2 text-[11px] text-gray-500">
+                  {VERDICT_META[verdict].description}
+                </p>
+              </div>
+
+              {/* Beliefs */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <Tag className="h-3.5 w-3.5 text-gray-500" />
+                  Beliefs touched
+                </label>
+                <input
+                  type="text"
+                  value={beliefsInput}
+                  onChange={(e) => setBeliefsInput(e.target.value)}
+                  placeholder="speed-over-polish, own-the-data, ..."
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/20"
+                />
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Comma-separated. Which of your beliefs did this decision
+                  lean on?
+                </p>
               </div>
 
               {error && (
@@ -484,22 +588,40 @@ export default function BuildVsRaidPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 border-t border-gray-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="rounded-lg border border-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-gray-700 hover:text-gray-100"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {submitting && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  {submitting ? "Posting..." : "Post Entry"}
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {submitting ? "Posting..." : "Post entry"}
                 </button>
               </div>
             </div>
           </form>
         )}
 
+        {/* Entry count */}
+        {!loading && entries.length > 0 && (
+          <div className="mb-4 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              {entries.length} {entries.length === 1 ? "audit" : "audits"}
+            </span>
+          </div>
+        )}
+
+        {/* List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3">
@@ -508,12 +630,26 @@ export default function BuildVsRaidPage() {
             </div>
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-800 py-20 text-gray-400">
-            <Inbox className="h-10 w-10 text-gray-600" />
-            <p className="text-sm">No build-vs-raid entries yet.</p>
-            <p className="text-xs text-gray-600">
-              Start by posting the first audit.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-gray-800 bg-gray-900/30 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-gray-800 bg-gray-900">
+              <Inbox className="h-6 w-6 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-300">
+                No audits yet
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Every time you decide between building a custom stack and
+                raiding a best-in-class tool, log it here.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs font-medium text-purple-300 transition-colors hover:border-purple-500/50 hover:bg-purple-500/20"
+            >
+              <Plus className="h-3.5 w-3.5" /> Post the first audit
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -522,83 +658,107 @@ export default function BuildVsRaidPage() {
               return (
                 <article
                   key={entry.id}
-                  className="rounded-xl border border-gray-800 bg-gray-900 p-5 transition-colors hover:border-gray-700"
+                  className={`overflow-hidden rounded-xl border border-l-4 border-gray-800 bg-gray-900 shadow-sm transition-all hover:border-gray-700 ${meta.accent}`}
                 >
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${meta.className}`}
-                      >
-                        {meta.label}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        by {authorLabel(entry.author)}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {formatDate(entry.created_at)}
-                    </span>
-                  </div>
-
-                  <h3 className="mb-3 text-base font-semibold text-gray-100">
-                    {entry.problem}
-                  </h3>
-
-                  {entry.raid_candidate && (
-                    <div className="mb-2 flex items-center gap-2 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Raid:
-                      </span>
-                      {entry.raid_candidate_url ? (
-                        <a
-                          href={entry.raid_candidate_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
-                        >
-                          {entry.raid_candidate}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-gray-300">
-                          {entry.raid_candidate}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {entry.current_approach && (
-                    <div className="mb-2 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Current:
-                      </span>{" "}
-                      <span className="text-gray-300">
-                        {entry.current_approach}
-                      </span>
-                    </div>
-                  )}
-
-                  {entry.unique_wins && (
-                    <div className="mb-3 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Unique wins:
-                      </span>{" "}
-                      <span className="text-gray-300">{entry.unique_wins}</span>
-                    </div>
-                  )}
-
-                  {entry.beliefs_touched && entry.beliefs_touched.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {entry.beliefs_touched.map((belief) => (
+                  <div className="p-5">
+                    {/* Top row: verdict badge + meta */}
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
                         <span
-                          key={belief}
-                          className="rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] text-purple-300"
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${meta.badge}`}
                         >
-                          {belief}
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+                          />
+                          {meta.label}
                         </span>
-                      ))}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {authorLabel(entry.author)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(entry.created_at)}
+                        </span>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Problem — primary heading */}
+                    <h3 className="mb-4 text-lg font-semibold leading-snug text-gray-100">
+                      {entry.problem}
+                    </h3>
+
+                    {/* Structured fields */}
+                    <dl className="space-y-3">
+                      {entry.raid_candidate && (
+                        <div className="flex gap-3">
+                          <dt className="flex w-28 flex-shrink-0 items-center gap-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                            <Package className="h-3 w-3" />
+                            Candidate
+                          </dt>
+                          <dd className="flex-1 text-sm">
+                            {entry.raid_candidate_url ? (
+                              <a
+                                href={entry.raid_candidate_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline"
+                              >
+                                {entry.raid_candidate}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className="text-gray-200">
+                                {entry.raid_candidate}
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                      )}
+
+                      {entry.current_approach && (
+                        <div className="flex gap-3">
+                          <dt className="flex w-28 flex-shrink-0 items-center gap-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                            <Wrench className="h-3 w-3" />
+                            Current
+                          </dt>
+                          <dd className="flex-1 whitespace-pre-wrap text-sm text-gray-300">
+                            {entry.current_approach}
+                          </dd>
+                        </div>
+                      )}
+
+                      {entry.unique_wins && (
+                        <div className="flex gap-3">
+                          <dt className="flex w-28 flex-shrink-0 items-center gap-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                            <Sparkles className="h-3 w-3" />
+                            Unique wins
+                          </dt>
+                          <dd className="flex-1 whitespace-pre-wrap text-sm text-gray-300">
+                            {entry.unique_wins}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+
+                    {/* Beliefs footer */}
+                    {entry.beliefs_touched &&
+                      entry.beliefs_touched.length > 0 && (
+                        <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-gray-800 pt-3">
+                          <Tag className="h-3 w-3 text-gray-600" />
+                          {entry.beliefs_touched.map((belief) => (
+                            <span
+                              key={belief}
+                              className="rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] text-purple-300"
+                            >
+                              {belief}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 </article>
               );
             })}
