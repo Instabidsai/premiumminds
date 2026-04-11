@@ -459,7 +459,11 @@ export default function ChatPage() {
       <MessageList messages={messages} loading={loading} />
 
       {/* Composer */}
-      <Composer onSend={handleSend} disabled={sending || loading} />
+      <Composer
+        onSend={handleSend}
+        disabled={sending || loading}
+        laneColor={lane?.color ?? null}
+      />
     </div>
   );
 }
