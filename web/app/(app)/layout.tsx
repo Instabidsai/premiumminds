@@ -302,7 +302,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   (lane.color && LANE_TEXT[lane.color]) || "text-gray-400";
                 const dotClass =
                   (lane.color && LANE_DOT[lane.color]) || "bg-gray-400";
-                const hasUnread = DEMO_UNREAD_SLUGS.has(lane.slug);
+                const hasUnread = (unreadBySlug[lane.slug] ?? 0) > 0;
                 return (
                   <Link
                     key={lane.id}

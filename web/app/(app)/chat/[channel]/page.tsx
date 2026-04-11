@@ -145,6 +145,32 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
+  // Mark channel as read for unread tracking
+  const markRead = useCallback(
+    async (channelId: string, userId: string) => {
+      try {
+        const { data: member } = await supabase
+          .from("members")
+          .select("id")
+          .eq("auth_user_id", userId)
+          .maybeSingle();
+        if (!member) return;
+        await supabase.from("channel_read_state").upsert(
+          {
+            member_id: member.id,
+            channel_id: channelId,
+            last_read_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "member_id,channel_id" }
+        );
+      } catch {
+        // Best-effort, don't break the chat flow
+      }
+    },
+    [supabase]
+  );
+
   // Load channel + messages
   useEffect(() => {
     let mounted = true;
@@ -221,6 +247,11 @@ export default function ChatPage() {
         setMessages((msgs as unknown as RawMessageRow[]).map(normalizeMessage));
       }
       setLoading(false);
+
+      // Mark channel as read after loading messages
+      if (user && ch) {
+        markRead(ch.id, user.id);
+      }
     }
 
     load();
@@ -286,6 +317,11 @@ export default function ChatPage() {
             if (prev.some((m) => m.id === fullMsg.id)) return prev;
             return [...prev, fullMsg];
           });
+
+          // Mark channel as read on each new message while viewing
+          if (authUserId && channel) {
+            markRead(channel.id, authUserId);
+          }
         }
       )
       .subscribe();
