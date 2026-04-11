@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import WelcomeModal from "@/components/onboarding/WelcomeModal";
 import * as Icons from "lucide-react";
 import {
   MessageSquare,
@@ -79,6 +80,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [unreadBySlug, setUnreadBySlug] = useState<Record<string, number>>({});
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [memberId, setMemberId] = useState<string | null>(null);
 
   // Close mobile nav when route changes
   useEffect(() => {
@@ -116,6 +119,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         .order("sort_order", { ascending: true });
 
       if (laneData) setLanes(laneData as Lane[]);
+
+      // Check onboarding status
+      const { data: memberRow } = await supabase
+        .from("members")
+        .select("id, onboarded_at")
+        .eq("auth_user_id", currentUser.id)
+        .maybeSingle();
+
+      if (memberRow) {
+        setMemberId(memberRow.id);
+        if (!memberRow.onboarded_at) {
+          setShowOnboarding(true);
+        }
+      }
+
       setLoading(false);
     }
 
@@ -387,6 +405,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main content. pt-14 on mobile makes room for the fixed top bar. */}
       <main className="flex-1 overflow-hidden pt-14 md:pt-0">{children}</main>
+
+      {/* Onboarding modal — first login only */}
+      {showOnboarding && memberId && user && (
+        <WelcomeModal
+          supabase={supabase}
+          memberId={memberId}
+          authUserId={user.id}
+        />
+      )}
     </div>
   );
 }
