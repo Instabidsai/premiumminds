@@ -1,7 +1,64 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { Bot, MessagesSquare, Sparkles } from "lucide-react";
+
+const URL_REGEX = /(https?:\/\/[^\s)<>"]+)/g;
+const BOLD_REGEX = /\*\*(.+?)\*\*/g;
+
+/** Render message body with clickable links and **bold** formatting */
+function RichBody({ text, className }: { text: string; className?: string }) {
+  const parts = useMemo(() => {
+    // Split on URLs first, then handle bold within each text part
+    const pieces: { type: "text" | "link"; value: string }[] = [];
+    let lastIndex = 0;
+    const urlMatches = [...text.matchAll(URL_REGEX)];
+
+    for (const match of urlMatches) {
+      const idx = match.index!;
+      if (idx > lastIndex) {
+        pieces.push({ type: "text", value: text.slice(lastIndex, idx) });
+      }
+      pieces.push({ type: "link", value: match[0] });
+      lastIndex = idx + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      pieces.push({ type: "text", value: text.slice(lastIndex) });
+    }
+    return pieces;
+  }, [text]);
+
+  return (
+    <p className={className}>
+      {parts.map((part, i) => {
+        if (part.type === "link") {
+          return (
+            <a
+              key={i}
+              href={part.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-400 underline decoration-purple-400/40 underline-offset-2 transition-colors hover:text-purple-300 hover:decoration-purple-300/60 break-all"
+            >
+              {part.value}
+            </a>
+          );
+        }
+        // Handle **bold** in text segments
+        const boldParts = part.value.split(BOLD_REGEX);
+        return boldParts.map((segment, j) =>
+          j % 2 === 1 ? (
+            <strong key={`${i}-${j}`} className="font-semibold text-gray-100">
+              {segment}
+            </strong>
+          ) : (
+            <span key={`${i}-${j}`}>{segment}</span>
+          )
+        );
+      })}
+    </p>
+  );
+}
 
 export interface Message {
   id: string;
@@ -232,13 +289,12 @@ export default function MessageList({
                     </span>
                   </div>
                 )}
-                <p
+                <RichBody
+                  text={msg.body}
                   className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
                     isAgent ? "text-gray-200" : "text-gray-300"
                   }`}
-                >
-                  {msg.body}
-                </p>
+                />
               </div>
             </div>
           );
