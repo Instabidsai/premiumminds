@@ -20,7 +20,9 @@ import {
   Rss,
   Menu,
   X,
+  Plus,
 } from "lucide-react";
+import CreateChannelModal from "@/components/channels/CreateChannelModal";
 
 interface Lane {
   id: string;
@@ -60,6 +62,28 @@ const COMMUNITY_CHANNELS = [
   { slug: "general", label: "general", icon: "Hash", desc: "Open discussion for everyone" },
 ] as const;
 
+interface CustomChannel {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+// All system channel slugs (lanes + community + built-in pages)
+const SYSTEM_CHANNEL_SLUGS = new Set([
+  "general",
+  "humans",
+  "ask-ai",
+  "meta-architecture",
+  "build-vs-raid",
+  "mcp-oss-intel",
+  "infrastructure",
+  "daily-ai-brief",
+  "failures-lessons",
+  "agents",
+  "research",
+  "show-and-tell",
+]);
+
 interface UnreadRow {
   channel_id: string;
   channel_slug: string;
@@ -78,6 +102,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [unreadBySlug, setUnreadBySlug] = useState<Record<string, number>>({});
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const [customChannels, setCustomChannels] = useState<CustomChannel[]>([]);
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
 
   // Close mobile nav when route changes
   useEffect(() => {
@@ -115,6 +141,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         .order("sort_order", { ascending: true });
 
       if (laneData) setLanes(laneData as Lane[]);
+
+      // Fetch custom channels (channels not in system list)
+      const { data: customCh } = await supabase
+        .from("channels")
+        .select("id, slug, name")
+        .order("name", { ascending: true });
+
+      if (customCh) {
+        setCustomChannels(
+          (customCh as CustomChannel[]).filter(
+            (ch) => !SYSTEM_CHANNEL_SLUGS.has(ch.slug)
+          )
+        );
+      }
 
       // Check onboarding status
       const { data: memberRow } = await supabase
@@ -395,6 +435,66 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          {/* Custom Channels */}
+          <div className="mb-2 mt-6 flex items-center justify-between px-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Custom Channels
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCreateChannel(true)}
+              title="Create a custom channel"
+              className="flex h-5 w-5 items-center justify-center rounded text-gray-600 transition-colors hover:bg-gray-800 hover:text-gray-300"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {customChannels.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowCreateChannel(true)}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-800/70 hover:text-gray-400"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Create your first channel</span>
+            </button>
+          ) : (
+            customChannels.map((cc) => {
+              const ccHref = `/chat/${cc.slug}`;
+              const ccActive = pathname === ccHref;
+              const ccUnread = unreadBySlug[cc.slug] ?? 0;
+              return (
+                <Link
+                  key={cc.id}
+                  href={ccHref}
+                  title={cc.name}
+                  className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                    ccActive
+                      ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                      : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
+                  }`}
+                >
+                  {ccActive && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-purple-400"
+                    />
+                  )}
+                  <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+                  <span className="flex-1 truncate">{cc.name}</span>
+                  {ccUnread > 0 && (
+                    <span
+                      aria-label={`${ccUnread} unread`}
+                      className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                    >
+                      {ccUnread > 99 ? "99+" : ccUnread}
+                    </span>
+                  )}
+                </Link>
+              );
+            })
+          )}
         </nav>
 
         {/* User info & sign out */}
@@ -433,6 +533,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           supabase={supabase}
           memberId={memberId}
           authUserId={user.id}
+        />
+      )}
+
+      {/* Create channel modal */}
+      {showCreateChannel && memberId && (
+        <CreateChannelModal
+          memberId={memberId}
+          onClose={() => setShowCreateChannel(false)}
         />
       )}
     </div>

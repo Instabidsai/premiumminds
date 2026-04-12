@@ -8,6 +8,7 @@ import Composer from "@/components/chat/Composer";
 import * as Icons from "lucide-react";
 import { Hash, Users, Compass, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import AgentConnectPanel from "@/components/channels/AgentConnectPanel";
 
 interface ChannelRow {
   id: string;
@@ -490,6 +491,9 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+
+      {/* Agent connect panel */}
+      {channel && <AgentConnectPanel channelSlug={channel.slug} />}
 
       {/* Messages */}
       <MessageList messages={messages} loading={loading} />
