@@ -741,14 +741,25 @@ export default function MessageList({
                   </div>
                 </div>
 
-                {/* Thread indicator */}
-                {replyCount > 0 && onToggleThread && (
-                  <ThreadIndicator
-                    replyCount={replyCount}
-                    expanded={isExpanded}
-                    onToggle={() => onToggleThread(msg.id)}
-                  />
-                )}
+                {/* Reply + Thread row — always visible */}
+                <div className="mt-1 ml-12 flex items-center gap-3">
+                  {onReply && !feedItem && (
+                    <button
+                      onClick={() => onReply({ id: msg.id, authorName: displayName, preview: msg.body })}
+                      className="flex items-center gap-1 text-xs text-gray-500 transition-colors hover:text-purple-400"
+                    >
+                      <MessageSquareReply className="h-3 w-3" />
+                      <span>Reply</span>
+                    </button>
+                  )}
+                  {replyCount > 0 && onToggleThread && (
+                    <ThreadIndicator
+                      replyCount={replyCount}
+                      expanded={isExpanded}
+                      onToggle={() => onToggleThread(msg.id)}
+                    />
+                  )}
+                </div>
 
                 {/* Inline thread replies */}
                 {isExpanded && replies && replies.length > 0 && (

@@ -140,27 +140,32 @@ export default function Composer({
           aria-hidden
         />
 
-        {/* Replying-to bar */}
+        {/* Replying-to bar — PROMINENT so users know they're threading */}
         {replyingTo && (
-          <div className="flex items-center gap-2 bg-purple-500/10 border-l-2 border-purple-500 px-3 py-2 text-sm">
-            <span className="min-w-0 flex-1 truncate text-gray-300">
-              Replying to{" "}
-              <span className="font-semibold text-purple-300">
-                {replyingTo.authorName}
+          <div className="flex items-center gap-3 bg-purple-500/15 border-l-4 border-purple-500 px-4 py-3 animate-fade-in">
+            <CornerDownLeft className="h-4 w-4 flex-shrink-0 text-purple-400" />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-0.5">
+                Replying in thread
+              </div>
+              <span className="text-sm text-gray-300 truncate block">
+                <span className="font-semibold text-gray-200">
+                  {replyingTo.authorName}
+                </span>
+                :{" "}
+                <span className="text-gray-500">
+                  {replyingTo.preview.length > 80
+                    ? replyingTo.preview.slice(0, 80) + "..."
+                    : replyingTo.preview}
+                </span>
               </span>
-              :{" "}
-              <span className="text-gray-500">
-                {replyingTo.preview.length > 60
-                  ? replyingTo.preview.slice(0, 60) + "..."
-                  : replyingTo.preview}
-              </span>
-            </span>
+            </div>
             <button
               onClick={onCancelReply}
-              className="flex-shrink-0 rounded p-0.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
-              title="Cancel reply"
+              className="flex-shrink-0 rounded-lg bg-gray-800 p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
+              title="Cancel — post as new message instead"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         )}
