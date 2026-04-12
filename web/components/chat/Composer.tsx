@@ -145,7 +145,7 @@ export default function Composer({
               rows={1}
               placeholder={PLACEHOLDERS[placeholderIndex]}
               aria-label="Compose a thought for this channel"
-              className="block w-full resize-none bg-transparent text-[15px] leading-6 text-gray-100 placeholder-gray-500 outline-none disabled:opacity-50"
+              className="block w-full resize-none rounded-lg bg-gray-950/30 px-3 py-1.5 text-[15px] leading-6 text-gray-100 placeholder-gray-500 shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)] outline-none transition-[placeholder] duration-500 disabled:opacity-50"
             />
           </div>
 
@@ -156,7 +156,7 @@ export default function Composer({
             aria-label={sending ? "Sending…" : "Send message"}
             className={`flex h-11 min-w-[44px] flex-shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all sm:h-9 sm:min-w-0 ${
               canSend
-                ? "bg-purple-600 text-white shadow-[0_0_16px_-4px_rgba(168,85,247,0.6)] hover:bg-purple-500"
+                ? "bg-purple-600 text-white shadow-[0_0_12px_-2px_rgba(168,85,247,0.45)] hover:bg-purple-500 hover:shadow-[0_0_18px_-2px_rgba(168,85,247,0.55)]"
                 : "bg-gray-800 text-gray-500"
             } disabled:cursor-not-allowed`}
           >
@@ -175,7 +175,7 @@ export default function Composer({
         </div>
 
         {/* Footer hint strip — shortcuts + hive indicator. Hidden on small screens to save space. */}
-        <div className="hidden items-center justify-between gap-4 border-t border-gray-800/60 bg-gray-950/40 px-5 py-2 text-[11px] text-gray-500 sm:flex">
+        <div className="hidden items-center justify-between gap-4 border-t border-gray-800/40 bg-gray-950/30 px-5 py-1.5 text-[10px] text-gray-600 sm:flex">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
               <kbd className="inline-flex h-4 items-center rounded border border-gray-700 bg-gray-900 px-1 font-sans text-[10px] text-gray-400">
@@ -194,15 +194,15 @@ export default function Composer({
               <span>for newline</span>
             </span>
           </div>
-          <div className="inline-flex items-center gap-1.5">
+          <div className="inline-flex items-center gap-1.5 opacity-70">
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${accent.dot} ${
                 sending ? "animate-pulse" : ""
               }`}
               aria-hidden
             />
-            <Network className="h-3 w-3 text-gray-600" />
-            <span className="text-gray-500">feeds the group mind</span>
+            <Network className="h-2.5 w-2.5 text-gray-600" />
+            <span className="text-gray-600">feeds the group mind</span>
           </div>
         </div>
       </div>

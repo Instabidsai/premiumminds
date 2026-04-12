@@ -10,6 +10,8 @@ import {
   GitBranch,
   Telescope,
   Users,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -21,6 +23,7 @@ export default function LandingPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,6 +55,10 @@ export default function LandingPage() {
           password,
         });
         if (signInError) throw signInError;
+      }
+      if (isSignUp) {
+        setSuccess(true);
+        await new Promise((r) => setTimeout(r, 1200));
       }
       router.push("/chat/general");
     } catch (err: unknown) {
@@ -162,7 +169,7 @@ export default function LandingPage() {
               {pillars.map(({ icon: Icon, title, body }) => (
                 <li
                   key={title}
-                  className="group relative rounded-xl border border-gray-800/80 bg-gray-900/40 p-4 backdrop-blur-sm transition-colors hover:border-purple-500/40 hover:bg-gray-900/70"
+                  className="group relative rounded-xl border border-gray-800/80 bg-gray-900/40 p-4 backdrop-blur-sm transition-all duration-200 hover:border-purple-500/40 hover:bg-gray-900/70 hover:scale-[1.01] hover:shadow-lg hover:shadow-purple-950/30"
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-purple-600/15 ring-1 ring-purple-500/25">
@@ -200,13 +207,13 @@ export default function LandingPage() {
             </div>
 
             {/* Card */}
-            <div className="relative">
+            <div className="group/card relative">
               {/* Glow */}
               <div
                 aria-hidden
-                className="absolute -inset-px rounded-2xl bg-gradient-to-br from-purple-600/40 via-purple-500/10 to-transparent opacity-60 blur-sm"
+                className="absolute -inset-px rounded-2xl bg-gradient-to-br from-purple-600/40 via-purple-500/10 to-transparent opacity-60 blur-sm transition-opacity duration-300 group-hover/card:opacity-80"
               />
-              <div className="relative rounded-2xl border border-gray-800 bg-gray-900/90 p-8 shadow-2xl shadow-purple-950/40 backdrop-blur-xl">
+              <div className="relative rounded-2xl border border-gray-800 bg-gray-900/90 p-8 shadow-2xl shadow-purple-950/40 backdrop-blur-xl transition-shadow duration-300 group-hover/card:shadow-purple-900/50">
                 <div className="mb-6 flex items-baseline justify-between">
                   <h2 className="text-lg font-semibold tracking-tight text-gray-100">
                     {isSignUp ? "Claim your seat" : "Return to the table"}
@@ -255,8 +262,16 @@ export default function LandingPage() {
                   </div>
 
                   {error && (
-                    <div className="rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-2.5 text-sm text-red-300">
-                      {error}
+                    <div className="flex items-start gap-2.5 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-2.5 text-sm text-red-300 animate-fade-in">
+                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {success && (
+                    <div className="flex items-center gap-2.5 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-4 py-2.5 text-sm text-emerald-300 animate-fade-in">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+                      <span>Account created. Taking you to the table...</span>
                     </div>
                   )}
 
@@ -301,7 +316,7 @@ export default function LandingPage() {
         </main>
 
         {/* Footer */}
-        <footer className="mt-16 flex items-center justify-between border-t border-gray-900 pt-6 text-[11px] text-gray-600">
+        <footer className="mt-20 flex items-center justify-between border-t border-gray-900 pt-8 pb-4 text-[11px] text-gray-600">
           <span className="uppercase tracking-[0.18em]">
             premiumminds.io
           </span>
