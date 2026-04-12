@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
-import { Bot, ExternalLink, MessagesSquare, Newspaper, Sparkles } from "lucide-react";
+import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import {
+  Bot,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  Link as LinkIcon,
+  MessagesSquare,
+  Newspaper,
+  Sparkles,
+} from "lucide-react";
 
 const URL_REGEX = /(https?:\/\/[^\s)<>"]+)/g;
 const BOLD_REGEX = /\*\*(.+?)\*\*/g;
@@ -226,6 +235,72 @@ function exactTime(dateStr: string): string {
   });
 }
 
+/** Returns a human-friendly label for a date separator */
+function dateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+
+  // Strip time for day comparisons
+  const strip = (dt: Date) =>
+    new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+
+  const dayMs = strip(d);
+  const todayMs = strip(now);
+  const diff = todayMs - dayMs;
+
+  if (diff === 0) return "Today";
+  if (diff === 86_400_000) return "Yesterday";
+
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/** Returns true when two ISO date strings fall on different calendar days */
+function isDifferentDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() !== db.getFullYear() ||
+    da.getMonth() !== db.getMonth() ||
+    da.getDate() !== db.getDate()
+  );
+}
+
+/** Small action bar that appears on message hover */
+function MessageHoverActions({ messageId, body }: { messageId: string; body: string }) {
+  const [copied, setCopied] = useState<"link" | "text" | null>(null);
+
+  const copyLink = useCallback(() => {
+    void navigator.clipboard.writeText(`#msg-${messageId}`);
+    setCopied("link");
+    setTimeout(() => setCopied(null), 1500);
+  }, [messageId]);
+
+  const copyText = useCallback(() => {
+    void navigator.clipboard.writeText(body);
+    setCopied("text");
+    setTimeout(() => setCopied(null), 1500);
+  }, [body]);
+
+  return (
+    <div className="absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded-md border border-gray-700 bg-gray-900 px-1 py-0.5 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+      <button
+        onClick={copyLink}
+        className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+        title={copied === "link" ? "Copied!" : "Copy link"}
+      >
+        <LinkIcon className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={copyText}
+        className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+        title={copied === "text" ? "Copied!" : "Copy text"}
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function authorDisplayName(author: Message["author"]): string {
   if (!author) return "Unknown";
   if (author.kind === "agent") return author.agent_name || "agent";
@@ -238,6 +313,21 @@ function authorHandle(author: Message["author"]): string | null {
   return author.member?.handle ?? null;
 }
 
+/** Visual separator for date boundaries */
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-3">
+      <div className="h-px flex-1 bg-gray-800" />
+      <span className="flex-shrink-0 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-gray-800" />
+    </div>
+  );
+}
+
+const SCROLL_THRESHOLD = 500;
+
 export default function MessageList({
   messages,
   loading,
@@ -249,8 +339,33 @@ export default function MessageList({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef<string | null>(null);
 
-  // Auto-scroll to bottom when a new message arrives. Use instant scroll on
-  // first load so users don't see the list animate up, and smooth after that.
+  // Track whether user is near the bottom of the scroll container
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [newMsgCount, setNewMsgCount] = useState(0);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
+
+  // Monitor scroll position
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      const distFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight;
+      const near = distFromBottom < SCROLL_THRESHOLD;
+      setIsNearBottom(near);
+      if (near) setNewMsgCount(0);
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-scroll to bottom when a new message arrives (if near bottom).
+  // If the user is scrolled up, increment the new-message counter instead.
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) {
@@ -258,13 +373,17 @@ export default function MessageList({
       return;
     }
     if (lastIdRef.current === last.id) return;
+
     const isFirstPaint = lastIdRef.current === null;
     lastIdRef.current = last.id;
-    bottomRef.current?.scrollIntoView({
-      behavior: isFirstPaint ? "auto" : "smooth",
-      block: "end",
-    });
-  }, [messages]);
+
+    if (isFirstPaint || isNearBottom) {
+      scrollToBottom(isFirstPaint ? "auto" : "smooth");
+      setNewMsgCount(0);
+    } else {
+      setNewMsgCount((c) => c + 1);
+    }
+  }, [messages, isNearBottom, scrollToBottom]);
 
   if (loading) {
     return (
@@ -315,139 +434,182 @@ export default function MessageList({
   }
 
   return (
-    <div
-      ref={scrollerRef}
-      className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin sm:px-6"
-    >
-      <div className="space-y-0.5">
-        {messages.map((msg, idx) => {
-          const author = msg.author;
-          const isAgent = author?.kind === "agent";
-          const displayName = authorDisplayName(author);
-          const handle = authorHandle(author);
+    <div className="relative flex-1 overflow-hidden">
+      <div
+        ref={scrollerRef}
+        className="h-full overflow-y-auto px-4 py-4 scrollbar-thin sm:px-6"
+      >
+        <div className="space-y-0.5">
+          {messages.map((msg, idx) => {
+            const author = msg.author;
+            const isAgent = author?.kind === "agent";
+            const displayName = authorDisplayName(author);
+            const handle = authorHandle(author);
 
-          const prevMsg = idx > 0 ? messages[idx - 1] : null;
-          const sameAuthor =
-            prevMsg?.author?.id === author?.id &&
-            new Date(msg.created_at).getTime() -
-              new Date(prevMsg!.created_at).getTime() <
-              120_000;
+            const prevMsg = idx > 0 ? messages[idx - 1] : null;
+            const sameAuthor =
+              prevMsg?.author?.id === author?.id &&
+              new Date(msg.created_at).getTime() -
+                new Date(prevMsg!.created_at).getTime() <
+                120_000;
 
-          const initial = displayName[0]?.toUpperCase() || "?";
+            // Date separator: show when first message or different calendar day
+            const showDateSep =
+              idx === 0 ||
+              (prevMsg && isDifferentDay(prevMsg.created_at, msg.created_at));
 
-          /* ── Feed-item card path ──────────────────────── */
-          const feedItem = parseFeedItem(
-            msg.body,
-            author?.kind,
-            author?.agent_name,
-          );
+            const initial = displayName[0]?.toUpperCase() || "?";
 
-          if (feedItem) {
+            /* ── Feed-item card path ──────────────────────── */
+            const feedItem = parseFeedItem(
+              msg.body,
+              author?.kind,
+              author?.agent_name,
+            );
+
+            if (feedItem) {
+              return (
+                <div key={msg.id}>
+                  {showDateSep && (
+                    <DateSeparator label={dateLabel(msg.created_at)} />
+                  )}
+                  <div className="group relative mt-3 first:mt-0 px-3">
+                    <MessageHoverActions messageId={msg.id} body={msg.body} />
+                    <FeedItemCard
+                      item={feedItem}
+                      time={relativeTime(msg.created_at)}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── Normal message path ──────────────────────── */
             return (
-              <div
-                key={msg.id}
-                className="mt-3 first:mt-0 px-3"
-              >
-                <FeedItemCard
-                  item={feedItem}
-                  time={relativeTime(msg.created_at)}
-                />
+              <div key={msg.id}>
+                {showDateSep && (
+                  <DateSeparator label={dateLabel(msg.created_at)} />
+                )}
+                <div
+                  id={`msg-${msg.id}`}
+                  className={`group relative flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-gray-900/60 ${
+                    sameAuthor ? "" : "mt-4 first:mt-0"
+                  } ${
+                    isAgent
+                      ? "hover:bg-purple-950/20"
+                      : ""
+                  }`}
+                >
+                  {/* Hover action bar */}
+                  <MessageHoverActions messageId={msg.id} body={msg.body} />
+
+                  {/* Agent left accent rail */}
+                  {isAgent && (
+                    <span
+                      className={`pointer-events-none absolute left-0 top-0 bottom-0 w-0.5 rounded-full bg-gradient-to-b from-purple-500/60 to-purple-500/10 ${
+                        sameAuthor ? "opacity-40" : "opacity-100"
+                      }`}
+                      aria-hidden
+                    />
+                  )}
+
+                  {/* Avatar column */}
+                  <div className="w-9 flex-shrink-0">
+                    {!sameAuthor ? (
+                      isAgent ? (
+                        <div
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-700/20 text-purple-200 ring-1 ring-purple-400/40 shadow-[0_0_18px_-6px_rgba(168,85,247,0.5)]"
+                          title={displayName}
+                        >
+                          <Bot className="h-[18px] w-[18px]" />
+                        </div>
+                      ) : (
+                        <div
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-sm font-semibold text-gray-200 ring-1 ring-gray-700"
+                          title={displayName}
+                        >
+                          {initial}
+                        </div>
+                      )
+                    ) : (
+                      <div
+                        className="mt-1 h-full w-9 text-center text-[10px] text-gray-700 opacity-0 group-hover:opacity-100"
+                        title={exactTime(msg.created_at)}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="min-w-0 flex-1">
+                    {!sameAuthor && (
+                      <div className="mb-0.5 flex items-baseline gap-2">
+                        <span
+                          className={`text-sm font-semibold ${
+                            isAgent ? "text-purple-200" : "text-gray-100"
+                          }`}
+                        >
+                          {displayName}
+                        </span>
+                        {isAgent ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-purple-300 ring-1 ring-inset ring-purple-400/30">
+                            <Bot className="h-2.5 w-2.5" />
+                            agent
+                          </span>
+                        ) : handle ? (
+                          <span className="text-xs text-gray-600">@{handle}</span>
+                        ) : null}
+                        <span
+                          className="cursor-default text-xs text-gray-600"
+                          title={exactTime(msg.created_at)}
+                        >
+                          {relativeTime(msg.created_at)}
+                        </span>
+                      </div>
+                    )}
+                    <RichBody
+                      text={msg.body}
+                      className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
+                        isAgent ? "text-gray-200" : "text-gray-300"
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
             );
-          }
-
-          /* ── Normal message path ──────────────────────── */
-          return (
-            <div
-              key={msg.id}
-              className={`group relative flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-gray-900/60 ${
-                sameAuthor ? "" : "mt-4 first:mt-0"
-              } ${
-                isAgent
-                  ? "hover:bg-purple-950/20"
-                  : ""
-              }`}
-            >
-              {/* Agent left accent rail (full-row on block start, dot on grouped rows) */}
-              {isAgent && (
-                <span
-                  className={`pointer-events-none absolute left-0 top-0 bottom-0 w-0.5 rounded-full bg-gradient-to-b from-purple-500/60 to-purple-500/10 ${
-                    sameAuthor ? "opacity-40" : "opacity-100"
-                  }`}
-                  aria-hidden
-                />
-              )}
-
-              {/* Avatar column */}
-              <div className="w-9 flex-shrink-0">
-                {!sameAuthor ? (
-                  isAgent ? (
-                    <div
-                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-700/20 text-purple-200 ring-1 ring-purple-400/40 shadow-[0_0_18px_-6px_rgba(168,85,247,0.5)]"
-                      title={displayName}
-                    >
-                      <Bot className="h-[18px] w-[18px]" />
-                    </div>
-                  ) : (
-                    <div
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-sm font-semibold text-gray-200 ring-1 ring-gray-700"
-                      title={displayName}
-                    >
-                      {initial}
-                    </div>
-                  )
-                ) : (
-                  <div
-                    className="mt-1 h-full w-9 text-center text-[10px] text-gray-700 opacity-0 group-hover:opacity-100"
-                    title={exactTime(msg.created_at)}
-                  >
-                    {new Date(msg.created_at).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="min-w-0 flex-1">
-                {!sameAuthor && (
-                  <div className="mb-0.5 flex items-baseline gap-2">
-                    <span
-                      className={`text-sm font-semibold ${
-                        isAgent ? "text-purple-200" : "text-gray-100"
-                      }`}
-                    >
-                      {displayName}
-                    </span>
-                    {isAgent ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-purple-300 ring-1 ring-inset ring-purple-400/30">
-                        <Bot className="h-2.5 w-2.5" />
-                        agent
-                      </span>
-                    ) : handle ? (
-                      <span className="text-xs text-gray-600">@{handle}</span>
-                    ) : null}
-                    <span
-                      className="text-xs text-gray-600"
-                      title={exactTime(msg.created_at)}
-                    >
-                      {relativeTime(msg.created_at)}
-                    </span>
-                  </div>
-                )}
-                <RichBody
-                  text={msg.body}
-                  className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
-                    isAgent ? "text-gray-200" : "text-gray-300"
-                  }`}
-                />
-              </div>
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
+          })}
+          <div ref={bottomRef} />
+        </div>
       </div>
+
+      {/* ── Floating: New messages pill ─────────────────────── */}
+      {newMsgCount > 0 && (
+        <button
+          onClick={() => {
+            scrollToBottom();
+            setNewMsgCount(0);
+          }}
+          className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-purple-500/40 bg-gray-900/95 px-4 py-1.5 text-xs font-medium text-purple-200 shadow-lg backdrop-blur transition-colors hover:border-purple-400/60 hover:bg-gray-800/95"
+        >
+          <ChevronDown className="-ml-0.5 mr-1 inline-block h-3.5 w-3.5" />
+          {newMsgCount} new message{newMsgCount === 1 ? "" : "s"}
+        </button>
+      )}
+
+      {/* ── Floating: Scroll-to-bottom button ───────────────── */}
+      {!isNearBottom && newMsgCount === 0 && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-gray-700 bg-gray-900/95 text-gray-400 shadow-lg backdrop-blur transition-colors hover:border-gray-600 hover:bg-gray-800 hover:text-gray-200"
+          title="Scroll to bottom"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
