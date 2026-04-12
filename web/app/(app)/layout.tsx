@@ -26,6 +26,7 @@ interface Lane {
   id: string;
   slug: string;
   name: string;
+  description: string | null;
   icon: string | null;
   color: string | null;
   sort_order: number | null;
@@ -52,17 +53,12 @@ const LANE_TEXT: Record<string, string> = {
   rose: "text-rose-400",
 };
 
-const LANE_DOT: Record<string, string> = {
-  purple: "bg-purple-400",
-  amber: "bg-amber-400",
-  blue: "bg-blue-400",
-  emerald: "bg-emerald-400",
-  sky: "bg-sky-400",
-  rose: "bg-rose-400",
-};
-
-// Demo unread indicators until real unread tracking is wired
-const DEMO_UNREAD_SLUGS = new Set<string>([]);
+// Community channel descriptions for tooltips
+const COMMUNITY_CHANNELS = [
+  { slug: "humans", label: "Humans Only", icon: "Users", desc: "No bots allowed — real human conversation" },
+  { slug: "ask-ai", label: "Ask the AI", icon: "Bot", desc: "Get answers from AI agents" },
+  { slug: "general", label: "general", icon: "Hash", desc: "Open discussion for everyone" },
+] as const;
 
 interface UnreadRow {
   channel_id: string;
@@ -115,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       // Fetch lanes ordered by sort_order
       const { data: laneData } = await supabase
         .from("lanes")
-        .select("id, slug, name, icon, color, sort_order")
+        .select("id, slug, name, description, icon, color, sort_order")
         .order("sort_order", { ascending: true });
 
       if (laneData) setLanes(laneData as Lane[]);
@@ -318,13 +314,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   Icons.Hash;
                 const colorClass =
                   (lane.color && LANE_TEXT[lane.color]) || "text-gray-400";
-                const dotClass =
-                  (lane.color && LANE_DOT[lane.color]) || "bg-gray-400";
-                const hasUnread = (unreadBySlug[lane.slug] ?? 0) > 0;
+                const unreadCount = unreadBySlug[lane.slug] ?? 0;
+                const tooltipParts = [lane.name];
+                if (lane.description) tooltipParts.push(lane.description);
+                if (unreadCount > 0) tooltipParts.push(`${unreadCount} unread`);
+                const tooltip = tooltipParts.join(" — ");
                 return (
                   <Link
                     key={lane.id}
                     href={href}
+                    title={tooltip}
                     className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                       active
                         ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
@@ -341,11 +340,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       className={`h-4 w-4 flex-shrink-0 ${colorClass}`}
                     />
                     <span className="flex-1 truncate">{lane.name}</span>
-                    {hasUnread && (
+                    {unreadCount > 0 && (
                       <span
-                        aria-label="unread activity"
-                        className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotClass} shadow-[0_0_6px_currentColor]`}
-                      />
+                        aria-label={`${unreadCount} unread`}
+                        className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                      >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
                     )}
                   </Link>
                 );
@@ -357,17 +358,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mb-2 mt-6 px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
             Community
           </div>
-          {[
-            { slug: "humans", label: "Humans Only", icon: "Users" },
-            { slug: "ask-ai", label: "Ask the AI", icon: "Bot" },
-            { slug: "general", label: "general", icon: "Hash" },
-          ].map((ch) => {
+          {COMMUNITY_CHANNELS.map((ch) => {
             const isActive = pathname === `/chat/${ch.slug}`;
             const ChIcon = (Icons as unknown as Record<string, typeof Hash>)[ch.icon] || Hash;
+            const chUnread = unreadBySlug[ch.slug] ?? 0;
+            const chTooltipParts: string[] = [ch.label, ch.desc];
+            if (chUnread > 0) chTooltipParts.push(`${chUnread} unread`);
+            const chTooltip = chTooltipParts.join(" — ");
             return (
               <Link
                 key={ch.slug}
                 href={`/chat/${ch.slug}`}
+                title={chTooltip}
                 className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                   isActive
                     ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
@@ -381,7 +383,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   />
                 )}
                 <ChIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
-                <span className="truncate">{ch.label}</span>
+                <span className="flex-1 truncate">{ch.label}</span>
+                {chUnread > 0 && (
+                  <span
+                    aria-label={`${chUnread} unread`}
+                    className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                  >
+                    {chUnread > 99 ? "99+" : chUnread}
+                  </span>
+                )}
               </Link>
             );
           })}
