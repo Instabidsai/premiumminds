@@ -79,6 +79,137 @@ body {
   animation: fade-in 0.4s ease-out both;
 }
 
+/* ── Slide-in from bottom (errors, success) ────────── */
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Subtle dot-grid float ──────────────────────────── */
+@keyframes dot-drift {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(2px, -3px);
+  }
+  50% {
+    transform: translate(-1px, 2px);
+  }
+  75% {
+    transform: translate(3px, 1px);
+  }
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(circle, rgba(168, 85, 247, 0.12) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: dot-drift 20s ease-in-out infinite;
+}
+
+/* ── Premium spinner ─────────────────────────────────── */
+@keyframes premium-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.premium-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: premium-spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* ── Pillar body crossfade ──────────────────────────── */
+@keyframes text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-text-reveal {
+  animation: text-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Input focus glow ring ──────────────────────────── */
+.input-premium:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow:
+    0 0 0 3px rgba(147, 51, 234, 0.15),
+    0 0 20px -4px rgba(147, 51, 234, 0.25);
+  outline: none;
+}
+
+/* ── Button shimmer overlay ──────────────────────────── */
+@keyframes btn-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Pillar card inner glow on hover ─────────────────── */
+.pillar-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(147, 51, 234, 0.08),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.pillar-card:hover::before {
+  opacity: 1;
+}
+
+/* ── Staggered entrance ──────────────────────────────── */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-in {
+  animation: stagger-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ── Thread reply staggered fade-in ───────────────── */
 @keyframes thread-reply-in {
   from {
@@ -116,6 +247,162 @@ body {
 
 .animate-badge-bounce {
   animation: badge-bounce 0.6s ease-out;
+}
+
+/* ── Subtle pulse for first-time hint ────────────────── */
+@keyframes hint-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(168, 85, 247, 0);
+  }
+}
+
+.animate-hint-pulse {
+  animation: hint-pulse 2s ease-in-out infinite;
+}
+
+/* ── Active nav glow ─────────────────────────────────── */
+.nav-active-glow {
+  box-shadow: 0 0 8px 0 rgba(168, 85, 247, 0.25), inset 0 0 8px 0 rgba(168, 85, 247, 0.08);
+}
+
+/* ── Sidebar mobile slide ────────────────────────────── */
+.sidebar-slide {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ── Composer: gradient border on focus ─────────────── */
+.composer-gradient-border {
+  position: relative;
+}
+.composer-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.5), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.composer-gradient-border:focus-within::before {
+  opacity: 1;
+}
+
+/* ── Composer: placeholder pulse ───────────────────── */
+@keyframes placeholder-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.6; }
+}
+.placeholder-pulse::placeholder {
+  animation: placeholder-pulse 3s ease-in-out infinite;
+}
+
+/* ── Composer: send button click ───────────────────── */
+@keyframes send-click {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.send-btn-click:active {
+  animation: send-click 0.15s ease-out;
+}
+
+/* ── Composer: reply bar slide-down ────────────────── */
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80px;
+  }
+}
+.animate-slide-down {
+  animation: slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── MessageList: message entrance ─────────────────── */
+@keyframes msg-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-msg-enter {
+  animation: msg-enter 0.15s ease-out both;
+}
+
+/* ── MessageList: new-messages pill bounce ──────────── */
+@keyframes pill-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  40% { transform: translateX(-50%) translateY(-4px); }
+  60% { transform: translateX(-50%) translateY(-2px); }
+}
+.animate-pill-bounce {
+  animation: pill-bounce 1.5s ease-in-out infinite;
+}
+
+/* ── MessageList: feed card hover lift ─────────────── */
+.feed-card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.feed-card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(107, 114, 128, 0.15);
+}
+
+/* ── Setup page: confetti dots ─────────────────────── */
+@keyframes confetti {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx, 10px), var(--dy, -20px)) scale(0); }
+}
+@keyframes scale-in {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* ── Search: focus glow ────────────────────────────── */
+@keyframes focus-glow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15); }
+  50% { box-shadow: 0 0 0 5px rgba(147, 51, 234, 0.25), 0 0 20px -4px rgba(147, 51, 234, 0.15); }
+}
+.search-focus-glow:focus {
+  animation: focus-glow 2s ease-in-out infinite;
+}
+
+/* ── Docs: drop zone pulse ─────────────────────────── */
+@keyframes drop-pulse {
+  0%, 100% { border-color: rgba(147, 51, 234, 0.5); }
+  50% { border-color: rgba(147, 51, 234, 0.9); background-color: rgba(147, 51, 234, 0.08); }
+}
+.drop-zone-pulse {
+  animation: drop-pulse 1.2s ease-in-out infinite;
+}
+
+/* ── Requests: upvote pop ──────────────────────────── */
+@keyframes upvote-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.upvote-pop {
+  animation: upvote-pop 0.3s ease-out;
 }
 
 /* ── Accessibility: reduced motion ─────────────────── */
