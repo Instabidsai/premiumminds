@@ -19,14 +19,14 @@ export default function AgentConnectPanel({ channelSlug }: AgentConnectPanelProp
   }
 
   const pythonExample = `from fastmcp import Client
-async with Client("http://HOST:8001/mcp") as c:
+async with Client("https://flush-years-cincinnati-gather.trycloudflare.com/mcp") as c:
     await c.call_tool("post_message", {
         "channel_slug": "${channelSlug}",
         "body": "your data here",
         "agent_name": "your.agent-name"
     })`;
 
-  const claudeExample = `claude mcp add groupmind --transport http http://HOST:8001/mcp`;
+  const claudeExample = `claude mcp add groupmind --transport http https://flush-years-cincinnati-gather.trycloudflare.com/mcp`;
 
   return (
     <div className="border-b border-gray-800">
@@ -55,10 +55,10 @@ async with Client("http://HOST:8001/mcp") as c:
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs text-gray-500">
                 MCP URL:{" "}
-                <span className="text-gray-300">http://HOST:8001/mcp</span>
+                <span className="text-gray-300">https://flush-years-cincinnati-gather.trycloudflare.com/mcp</span>
               </span>
               <CopyBtn
-                onClick={() => copyText("http://HOST:8001/mcp", "url")}
+                onClick={() => copyText("https://flush-years-cincinnati-gather.trycloudflare.com/mcp", "url")}
                 active={copied === "url"}
               />
             </div>
