@@ -18,7 +18,7 @@ export default function LandingPage() {
   const router = useRouter();
   const supabase = createBrowserClient();
 
-  const [isSignUp, setIsSignUp] = useState(false);
+  const isSignUp = false; // Signup disabled — accounts are created by admin only
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export default function LandingPage() {
         setSuccess(true);
         await new Promise((r) => setTimeout(r, 1200));
       }
-      router.push("/chat/general");
+      router.push("/chat/humans");
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "An unexpected error occurred";
@@ -292,18 +292,9 @@ export default function LandingPage() {
 
                 <div className="mt-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-gray-800" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSignUp(!isSignUp);
-                      setError(null);
-                    }}
-                    className="text-xs font-medium text-purple-400 transition-colors hover:text-purple-300"
-                  >
-                    {isSignUp
-                      ? "Already have an account? Sign in"
-                      : "Have an invitation? Create account"}
-                  </button>
+                  <span className="text-xs text-gray-600">
+                    Accounts are created by invitation only
+                  </span>
                   <div className="h-px flex-1 bg-gray-800" />
                 </div>
               </div>

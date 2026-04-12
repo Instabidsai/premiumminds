@@ -35,7 +35,7 @@ interface Lane {
 }
 
 const NAV_ITEMS = [
-  { href: "/chat/general", label: "Chat", icon: MessageSquare },
+  { href: "/chat/humans", label: "Chat", icon: MessageSquare },
   { href: "/lanes", label: "Lanes", icon: LayoutGrid },
   { href: "/mindmap", label: "Mind Map", icon: Brain },
   { href: "/docs", label: "Docs", icon: FileText },
@@ -222,8 +222,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   function isNavActive(href: string): boolean {
-    if (href === "/chat/general") {
-      return pathname === "/chat/general";
+    if (href === "/chat/humans") {
+      return pathname === "/chat/humans";
     }
     return pathname === href || pathname.startsWith(href + "/");
   }
