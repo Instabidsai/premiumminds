@@ -56,8 +56,8 @@ const LANE_TEXT: Record<string, string> = {
 };
 
 // Community channel descriptions for tooltips
+// #humans is handled by the top-level "Chat" nav link — not listed here
 const COMMUNITY_CHANNELS = [
-  { slug: "humans", label: "Humans Only", icon: "Users", desc: "No bots allowed — real human conversation" },
   { slug: "ask-ai", label: "Ask the AI", icon: "Bot", desc: "Get answers from AI agents" },
   { slug: "general", label: "general", icon: "Hash", desc: "Open discussion for everyone" },
 ] as const;
