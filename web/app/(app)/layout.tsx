@@ -288,13 +288,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           type="button"
           aria-label="Close navigation"
           onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md transition-opacity duration-300 md:hidden"
         />
       )}
 
       {/* Sidebar — fixed drawer on mobile, static column on md+ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-800 bg-gray-900 transition-transform duration-200 md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 ${
+        className={`sidebar-slide fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-800 bg-gray-900 md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
@@ -309,23 +309,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
 
         {/* Brand header */}
-        <div className="flex items-center gap-2.5 border-b border-gray-800 px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600/20 ring-1 ring-purple-500/30">
-            <Brain className="h-5 w-5 text-purple-400" />
+        <div className="flex-shrink-0">
+          <div className="flex items-center gap-2.5 px-5 py-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600/20 ring-1 ring-purple-500/30">
+              <Brain className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[15px] font-bold tracking-tight">
+                <span className="text-purple-400">Premium</span>
+                <span className="text-gray-100">Minds</span>
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                Group Mind
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-[15px] font-bold tracking-tight">
-              <span className="text-purple-400">Premium</span>
-              <span className="text-gray-100">Minds</span>
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
-              Group Mind
-            </span>
-          </div>
+          {/* Gradient separator */}
+          <div
+            aria-hidden
+            className="h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(168,85,247,0.3) 30%, rgba(168,85,247,0.3) 70%, transparent)",
+            }}
+          />
         </div>
 
-        {/* Nav links */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {/* Nav links — scrollable middle section */}
+        <nav className="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
             Navigation
           </div>
@@ -335,9 +346,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors md:py-2 ${
+                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out md:py-2 ${
                   active
-                    ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                    ? "nav-active-glow bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
                     : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
                 }`}
               >
@@ -348,7 +359,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   />
                 )}
                 <Icon
-                  className={`h-4 w-4 flex-shrink-0 transition-colors ${
+                  className={`h-4 w-4 flex-shrink-0 transition-colors duration-200 ease-out ${
                     active
                       ? "text-purple-300"
                       : "text-gray-500 group-hover:text-gray-300"
@@ -362,11 +373,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Lanes */}
           {lanes.length > 0 && (
             <>
-              <div className="mb-2 mt-6 flex items-center justify-between px-2">
+              <div className="mb-2 mt-6 flex items-center gap-2 px-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                   Lanes
                 </span>
-                <span className="text-[10px] font-medium text-gray-600">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-gray-800 px-1 text-[9px] font-semibold tabular-nums text-gray-400 ring-1 ring-gray-700/60">
                   {lanes.length}
                 </span>
               </div>
@@ -391,9 +402,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     key={lane.id}
                     href={href}
                     title={tooltip}
-                    className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                    className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ease-out ${
                       active
-                        ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                        ? "nav-active-glow bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
                         : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
                     }`}
                   >
@@ -439,9 +450,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 key={ch.slug}
                 href={`/chat/${ch.slug}`}
                 title={chTooltip}
-                className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ease-out ${
                   isActive
-                    ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                    ? "nav-active-glow bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
                     : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
                 }`}
               >
@@ -467,7 +478,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Custom Channels */}
+          {/* Custom Channels — visually distinct with left border accent */}
           <div className="mb-2 mt-6 flex items-center justify-between px-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
               Custom Channels
@@ -476,83 +487,106 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setShowCreateChannel(true)}
               title="Create a custom channel"
-              className="flex h-5 w-5 items-center justify-center rounded text-gray-600 transition-colors hover:bg-gray-800 hover:text-gray-300"
+              className={`flex h-5 w-5 items-center justify-center rounded text-gray-600 transition-all duration-200 ease-out hover:bg-gray-800 hover:text-gray-300${
+                customChannels.length === 0 ? " animate-hint-pulse rounded-full" : ""
+              }`}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
-          {customChannels.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => setShowCreateChannel(true)}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-800/70 hover:text-gray-400"
-            >
-              <Plus className="h-3 w-3" />
-              <span>Create your first channel</span>
-            </button>
-          ) : (
-            customChannels.map((cc) => {
-              const ccHref = `/chat/${cc.slug}`;
-              const ccActive = pathname === ccHref;
-              const ccUnread = unreadBySlug[cc.slug] ?? 0;
-              return (
-                <Link
-                  key={cc.id}
-                  href={ccHref}
-                  title={cc.name}
-                  className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                    ccActive
-                      ? "bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
-                      : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
-                  }`}
-                >
-                  {ccActive && (
-                    <span
-                      aria-hidden
-                      className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-purple-400"
-                    />
-                  )}
-                  <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
-                  <span className="flex-1 truncate">{cc.name}</span>
-                  {ccUnread > 0 && (
-                    <span
-                      aria-label={`${ccUnread} unread`}
-                      className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white${
-                        bouncingSlugs.has(cc.slug) ? " animate-badge-bounce" : ""
-                      }`}
-                    >
-                      {ccUnread > 99 ? "99+" : ccUnread}
-                    </span>
-                  )}
-                </Link>
-              );
-            })
-          )}
+          <div className="ml-2 border-l border-dashed border-gray-700/50 pl-1">
+            {customChannels.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowCreateChannel(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-gray-600 transition-all duration-200 ease-out hover:bg-gray-800/70 hover:text-gray-400"
+              >
+                <Plus className="h-3 w-3" />
+                <span>Create your first channel</span>
+              </button>
+            ) : (
+              customChannels.map((cc) => {
+                const ccHref = `/chat/${cc.slug}`;
+                const ccActive = pathname === ccHref;
+                const ccUnread = unreadBySlug[cc.slug] ?? 0;
+                return (
+                  <Link
+                    key={cc.id}
+                    href={ccHref}
+                    title={cc.name}
+                    className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-200 ease-out ${
+                      ccActive
+                        ? "nav-active-glow bg-purple-600/15 text-purple-200 ring-1 ring-inset ring-purple-500/30"
+                        : "text-gray-400 hover:bg-gray-800/70 hover:text-gray-100"
+                    }`}
+                  >
+                    {ccActive && (
+                      <span
+                        aria-hidden
+                        className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-purple-400"
+                      />
+                    )}
+                    <Hash className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+                    <span className="flex-1 truncate">{cc.name}</span>
+                    {ccUnread > 0 && (
+                      <span
+                        aria-label={`${ccUnread} unread`}
+                        className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white${
+                          bouncingSlugs.has(cc.slug) ? " animate-badge-bounce" : ""
+                        }`}
+                      >
+                        {ccUnread > 99 ? "99+" : ccUnread}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })
+            )}
+          </div>
         </nav>
 
         {/* User info & sign out */}
-        <div className="border-t border-gray-800 bg-gray-900/60 px-3 py-3">
-          <div className="flex items-center gap-3 rounded-lg px-2 py-1.5">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-800 text-xs font-semibold uppercase text-purple-300 ring-1 ring-gray-700">
-              {userInitial}
+        <div className="flex-shrink-0">
+          {/* Top gradient separator mirroring brand header */}
+          <div
+            aria-hidden
+            className="h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(168,85,247,0.2) 30%, rgba(168,85,247,0.2) 70%, transparent)",
+            }}
+          />
+          <div className="bg-gray-900/60 px-3 py-3">
+            <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors duration-200 ease-out hover:bg-gray-800/40">
+              <div className="relative flex-shrink-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-xs font-semibold uppercase text-purple-300 ring-1 ring-gray-700">
+                  {userInitial}
+                </div>
+                {/* Online indicator dot */}
+                <span
+                  aria-hidden
+                  className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-gray-900"
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="max-w-[140px] truncate text-sm font-medium text-gray-200">
+                  {user?.email}
+                </p>
+                <p className="text-[11px] text-gray-500">
+                  Online
+                </p>
+              </div>
+              <button
+                onClick={handleSignOut}
+                title="Sign out"
+                aria-label="Sign out"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-all duration-200 ease-out hover:bg-gray-800 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600 md:h-9 md:w-9"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-200">
-                {user?.email}
-              </p>
-              <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Online
-              </p>
-            </div>
-            <button
-              onClick={handleSignOut}
-              title="Sign out"
-              aria-label="Sign out"
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600 md:h-9 md:w-9"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
           </div>
         </div>
       </aside>
