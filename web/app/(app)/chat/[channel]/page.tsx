@@ -145,6 +145,9 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [pinnedMessages, setPinnedMessages] = useState<
+    { id: string; message: string; link_to_channel: string | null; link_label: string | null }[]
+  >([]);
 
   // Mark channel as read for unread tracking
   const markRead = useCallback(
@@ -202,6 +205,19 @@ export default function ChatPage() {
       }
 
       setChannel(ch);
+
+      // Fetch pinned messages for this channel
+      try {
+        const { data: pins } = await supabase
+          .from("pinned_messages")
+          .select("id, message, link_to_channel, link_label")
+          .eq("channel_id", ch.id)
+          .eq("active", true)
+          .order("pinned_at", { ascending: false });
+        if (mounted && pins) setPinnedMessages(pins);
+      } catch {
+        // Non-critical
+      }
 
       // Best-effort: fetch lane metadata (slug matches) and member count.
       // Wrapped in try/catch so header stays usable even if tables are empty or
@@ -494,6 +510,27 @@ export default function ChatPage() {
 
       {/* Agent connect panel */}
       {channel && <AgentConnectPanel channelSlug={channel.slug} />}
+
+      {/* Pinned messages */}
+      {pinnedMessages.length > 0 && (
+        <div className="border-b border-gray-800 bg-purple-500/5 px-6 py-2.5 space-y-2">
+          {pinnedMessages.map((pin) => (
+            <div key={pin.id} className="flex items-center gap-3 text-sm">
+              <Icons.Pin className="h-3.5 w-3.5 flex-shrink-0 text-purple-400" />
+              <span className="flex-1 text-gray-300">{pin.message}</span>
+              {pin.link_to_channel && (
+                <Link
+                  href={`/chat/${pin.link_to_channel}`}
+                  className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-500"
+                >
+                  {pin.link_label || "Go"}
+                  <Icons.ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <MessageList messages={messages} loading={loading} />
