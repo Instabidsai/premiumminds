@@ -581,10 +581,10 @@ export default function RequestsPage() {
                           ? `Voted (${req.upvotes})`
                           : `Upvote (${req.upvotes})`
                       }
-                      className={`group flex h-16 w-14 flex-shrink-0 flex-col items-center justify-center rounded-lg border transition-all active:scale-95 ${
+                      className={`group flex h-16 w-14 flex-shrink-0 flex-col items-center justify-center rounded-lg border transition-all ${
                         voted
-                          ? "border-purple-500/50 bg-purple-500/15 text-purple-300"
-                          : "border-gray-800 bg-gray-950 text-gray-400 hover:-translate-y-0.5 hover:border-purple-500/50 hover:bg-purple-500/5 hover:text-purple-300"
+                          ? "upvote-pop border-purple-500/50 bg-purple-500/15 text-purple-300"
+                          : "border-gray-800 bg-gray-950 text-gray-400 hover:-translate-y-0.5 hover:border-purple-500/50 hover:bg-purple-500/5 hover:text-purple-300 active:scale-90"
                       } disabled:cursor-not-allowed disabled:opacity-80`}
                     >
                       {upvoting === req.id ? (

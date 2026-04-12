@@ -155,7 +155,7 @@ export default function SearchPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search messages, documents, and the knowledge graph..."
-              className="w-full rounded-2xl border border-gray-800 bg-gray-900 py-4 pl-12 pr-36 text-base text-gray-100 placeholder-gray-500 shadow-lg shadow-black/20 transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+              className="search-focus-glow w-full rounded-2xl border border-gray-800 bg-gray-900 py-4 pl-12 pr-36 text-base text-gray-100 placeholder-gray-500 shadow-lg shadow-black/20 transition-all focus:border-purple-500 focus:outline-none"
               autoFocus
             />
             <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">

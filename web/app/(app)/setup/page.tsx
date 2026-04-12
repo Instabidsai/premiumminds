@@ -100,7 +100,7 @@ curl -X POST ${MCP_URL} \\
 
 function StepNumber({ n }: { n: number }) {
   return (
-    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">
+    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-purple-700 text-sm font-bold text-white shadow-lg shadow-purple-900/40 ring-2 ring-purple-400/20">
       {n}
     </span>
   );
@@ -109,17 +109,24 @@ function StepNumber({ n }: { n: number }) {
 function CodeBlock({
   code,
   label,
+  lang,
   copied,
   onCopy,
 }: {
   code: string;
   label: string;
+  lang?: string;
   copied: boolean;
   onCopy: () => void;
 }) {
   return (
     <div className="group relative">
-      <pre className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-950 p-4 pr-16 font-mono text-[13px] leading-relaxed text-gray-300">
+      {lang && (
+        <span className="absolute left-3 top-3 rounded-md bg-gray-800/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          {lang}
+        </span>
+      )}
+      <pre className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-950 p-4 pt-9 pr-16 font-mono text-[13px] leading-relaxed text-gray-300">
         {code}
       </pre>
       <button
@@ -322,20 +329,23 @@ export default function SetupPage() {
             </div>
 
             {/* Tabs */}
-            <div className="mb-4 flex gap-1 rounded-xl border border-gray-800 bg-gray-900 p-1">
+            <div className="relative mb-4 flex border-b border-gray-800">
               {tabs.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setActiveTab(key)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                  className={`relative flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === key
-                      ? "bg-purple-600 text-white shadow-sm shadow-purple-900/40"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                      ? "text-purple-300"
+                      : "text-gray-400 hover:text-gray-200"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
                   {label}
+                  {activeTab === key && (
+                    <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-purple-500 transition-all duration-300" />
+                  )}
                 </button>
               ))}
             </div>
@@ -343,6 +353,7 @@ export default function SetupPage() {
             <CodeBlock
               code={codeMap[activeTab]}
               label="Copy"
+              lang={activeTab === "python" ? "python" : activeTab === "curl" ? "bash" : "shell"}
               copied={copied === activeTab}
               onCopy={() => copy(codeMap[activeTab], activeTab)}
             />
@@ -390,9 +401,24 @@ export default function SetupPage() {
               </button>
 
               {testStatus === "success" && (
-                <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-800/60 bg-emerald-900/20 px-4 py-2.5 text-sm text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                  Test message sent! Check #{effectiveChannel} to see it.
+                <div className="relative mt-4 overflow-hidden rounded-lg border border-emerald-800/60 bg-emerald-900/20 px-4 py-2.5 text-sm text-emerald-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-400 animate-[scale-in_0.3s_ease-out]" />
+                    <span className="font-medium">Connected!</span> Check #{effectiveChannel} to see it.
+                  </div>
+                  {/* CSS confetti dots */}
+                  {[...Array(8)].map((_, i) => (
+                    <span
+                      key={i}
+                      className="absolute h-1.5 w-1.5 rounded-full animate-[confetti_0.8s_ease-out_forwards] opacity-0"
+                      style={{
+                        left: `${20 + i * 9}%`,
+                        top: "50%",
+                        backgroundColor: ["#34d399", "#a78bfa", "#38bdf8", "#fbbf24", "#34d399", "#a78bfa", "#38bdf8", "#fbbf24"][i],
+                        animationDelay: `${i * 0.05}s`,
+                      }}
+                    />
+                  ))}
                 </div>
               )}
 

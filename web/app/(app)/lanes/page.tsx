@@ -162,6 +162,19 @@ function isLive(iso: string | null): boolean {
   return diffMs < 1000 * 60 * 60 * 2;
 }
 
+const BRIDGE_TIPS: Record<string, string> = {
+  "build-vs-raid": "Feed audit decisions into this lane",
+  requests: "Feature requests that affect this lane",
+  feeds: "External content piped in here",
+  search: "Search surfaces this lane's content",
+  docs: "Documents shared in this lane",
+  mindmap: "Visualized in the knowledge graph",
+};
+
+function bridgeTip(slug: string): string {
+  return BRIDGE_TIPS[slug] ?? `Connected to #${slug}`;
+}
+
 export default function LanesPage() {
   const supabase = createBrowserClient();
   const [lanes, setLanes] = useState<Lane[]>([]);
@@ -466,7 +479,8 @@ function FeaturedCard({
               {bridges.map((bridge) => (
                 <span
                   key={bridge}
-                  className={`rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}
+                  title={bridgeTip(bridge)}
+                  className={`cursor-help rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}
                 >
                   {bridge}
                 </span>
@@ -525,7 +539,7 @@ function LaneCard({
   return (
     <Link
       href={`/chat/${lane.slug}`}
-      className={`group relative flex min-h-[260px] flex-col gap-4 overflow-hidden rounded-xl border p-6 transition-all duration-200 ${style.border} ${style.bg} ${style.hoverBorder} hover:-translate-y-0.5 hover:shadow-lg ${style.glow}`}
+      className={`group relative flex min-h-[260px] flex-col gap-4 overflow-hidden rounded-xl border p-6 transition-all duration-200 ${style.border} ${style.bg} ${style.hoverBorder} hover:-translate-y-1 hover:shadow-xl hover:shadow-black/30 ${style.glow}`}
     >
       {/* Gradient sheen */}
       <div
@@ -572,7 +586,8 @@ function LaneCard({
             {bridges.map((bridge) => (
               <span
                 key={bridge}
-                className={`rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}
+                title={bridgeTip(bridge)}
+                className={`cursor-help rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}
               >
                 {bridge}
               </span>

@@ -269,7 +269,7 @@ export default function DocsPage() {
                 onClick={() => fileInputRef.current?.click()}
                 className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${
                   dragActive
-                    ? "border-purple-500 bg-purple-500/10"
+                    ? "drop-zone-pulse border-purple-500 bg-purple-500/10"
                     : file
                       ? "border-purple-600/60 bg-purple-600/5"
                       : "border-gray-700 bg-gray-800/40 hover:border-gray-600 hover:bg-gray-800/70"

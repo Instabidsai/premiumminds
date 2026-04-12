@@ -151,7 +151,7 @@ const LEGEND: LegendItem[] = [
 
 function Legend({ counts }: { counts: Record<string, number> }) {
   return (
-    <div className="pointer-events-auto absolute left-4 top-4 z-10 rounded-lg border border-gray-800 bg-gray-900/90 p-3 shadow-xl backdrop-blur">
+    <div className="pointer-events-auto absolute left-4 top-4 z-10 hidden rounded-lg border border-gray-800 bg-gray-900/90 p-3 shadow-xl backdrop-blur sm:block">
       <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
         <Network className="h-3 w-3" />
         Legend

@@ -16,6 +16,13 @@ import {
   Tag,
   User,
   Clock,
+  Check,
+  Hammer,
+  ArrowLeftRight,
+  Eye,
+  Ban,
+  HelpCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 type Verdict = "raid" | "build" | "hybrid" | "watch" | "skip" | "undecided";
@@ -47,6 +54,7 @@ interface VerdictMeta {
   badge: string;
   accent: string;
   dot: string;
+  icon: LucideIcon;
   description: string;
 }
 
@@ -56,6 +64,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-blue-500/15 text-blue-300 border-blue-500/40",
     accent: "border-l-blue-500",
     dot: "bg-blue-400",
+    icon: Check,
     description: "Use the best-in-class tool instead of building",
   },
   build: {
@@ -63,6 +72,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-purple-500/15 text-purple-300 border-purple-500/40",
     accent: "border-l-purple-500",
     dot: "bg-purple-400",
+    icon: Hammer,
     description: "Our version is worth the investment",
   },
   hybrid: {
@@ -70,6 +80,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
     accent: "border-l-amber-500",
     dot: "bg-amber-400",
+    icon: ArrowLeftRight,
     description: "Raid the core, build the thin wrapper",
   },
   watch: {
@@ -77,6 +88,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-gray-500/20 text-gray-300 border-gray-500/40",
     accent: "border-l-gray-500",
     dot: "bg-gray-400",
+    icon: Eye,
     description: "Not urgent, revisit later",
   },
   skip: {
@@ -84,6 +96,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-red-500/15 text-red-300 border-red-500/40",
     accent: "border-l-red-500",
     dot: "bg-red-400",
+    icon: Ban,
     description: "Not worth doing at all",
   },
   undecided: {
@@ -91,6 +104,7 @@ const VERDICT_META: Record<Verdict, VerdictMeta> = {
     badge: "bg-gray-800 text-gray-400 border-gray-700",
     accent: "border-l-gray-700",
     dot: "bg-gray-500",
+    icon: HelpCircle,
     description: "Still working through it",
   },
 };
@@ -664,14 +678,17 @@ export default function BuildVsRaidPage() {
                     {/* Top row: verdict badge + meta */}
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${meta.badge}`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
-                          />
-                          {meta.label}
-                        </span>
+                        {(() => {
+                          const VerdictIcon = meta.icon;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider ${meta.badge}`}
+                            >
+                              <VerdictIcon className="h-3.5 w-3.5" />
+                              {meta.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-3 text-[11px] text-gray-500">
                         <span className="flex items-center gap-1">

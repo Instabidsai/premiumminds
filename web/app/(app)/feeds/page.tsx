@@ -64,10 +64,19 @@ const KIND_OPTIONS: {
 // Kind badge colors — each kind gets a lane color.
 const KIND_BADGE: Record<FeedKind, string> = {
   rss: "bg-amber-500/10 text-amber-300 ring-amber-500/30",
-  arxiv: "bg-purple-500/10 text-purple-300 ring-purple-500/30",
-  hn: "bg-rose-500/10 text-rose-300 ring-rose-500/30",
-  github_releases: "bg-sky-500/10 text-sky-300 ring-sky-500/30",
+  arxiv: "bg-red-500/10 text-red-300 ring-red-500/30",
+  hn: "bg-orange-500/10 text-orange-300 ring-orange-500/30",
+  github_releases: "bg-gray-500/10 text-gray-200 ring-gray-500/30",
   url_poll: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+};
+
+// Favicon-style dot color for known sources
+const KIND_DOT: Record<FeedKind, string> = {
+  rss: "bg-amber-400",
+  arxiv: "bg-red-500",
+  hn: "bg-orange-500",
+  github_releases: "bg-white",
+  url_poll: "bg-emerald-400",
 };
 
 const KIND_LABEL: Record<FeedKind, string> = {
@@ -462,6 +471,7 @@ export default function FeedsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${KIND_DOT[feed.kind]}`} />
                         <h3 className="truncate font-semibold text-gray-100">
                           {feed.label}
                         </h3>
