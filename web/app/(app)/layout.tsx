@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase";
@@ -106,6 +106,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [customChannels, setCustomChannels] = useState<CustomChannel[]>([]);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [bouncingSlugs, setBouncingSlugs] = useState<Set<string>>(new Set());
+  const prevUnreadRef = useRef<Record<string, number>>({});
+
+  // Detect unread count increases and trigger badge bounce animation
+  useEffect(() => {
+    const prev = prevUnreadRef.current;
+    const newBouncing = new Set<string>();
+
+    for (const [slug, count] of Object.entries(unreadBySlug)) {
+      const prevCount = prev[slug] ?? 0;
+      if (count > prevCount && count > 0) {
+        newBouncing.add(slug);
+      }
+    }
+
+    if (newBouncing.size > 0) {
+      setBouncingSlugs(newBouncing);
+      // Clear bounce after animation duration (600ms)
+      const timer = setTimeout(() => setBouncingSlugs(new Set()), 700);
+      prevUnreadRef.current = { ...unreadBySlug };
+      return () => clearTimeout(timer);
+    }
+
+    prevUnreadRef.current = { ...unreadBySlug };
+  }, [unreadBySlug]);
 
   // Close mobile nav when route changes
   useEffect(() => {
@@ -385,7 +410,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {unreadCount > 0 && (
                       <span
                         aria-label={`${unreadCount} unread`}
-                        className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                        className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white${
+                          bouncingSlugs.has(lane.slug) ? " animate-badge-bounce" : ""
+                        }`}
                       >
                         {unreadCount > 99 ? "99+" : unreadCount}
                       </span>
@@ -429,7 +456,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {chUnread > 0 && (
                   <span
                     aria-label={`${chUnread} unread`}
-                    className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                    className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white${
+                      bouncingSlugs.has(ch.slug) ? " animate-badge-bounce" : ""
+                    }`}
                   >
                     {chUnread > 99 ? "99+" : chUnread}
                   </span>
@@ -488,7 +517,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   {ccUnread > 0 && (
                     <span
                       aria-label={`${ccUnread} unread`}
-                      className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white"
+                      className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 px-1.5 text-[10px] font-bold leading-none text-white${
+                        bouncingSlugs.has(cc.slug) ? " animate-badge-bounce" : ""
+                      }`}
                     >
                       {ccUnread > 99 ? "99+" : ccUnread}
                     </span>

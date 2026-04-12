@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase";
-import MessageList, { type Message, type ReplyTarget } from "@/components/chat/MessageList";
+import MessageList, { type Message, type ReplyTarget, type ChannelInfo } from "@/components/chat/MessageList";
 import Composer, { type ReplyingTo } from "@/components/chat/Composer";
 import * as Icons from "lucide-react";
 import { Hash, Users, Compass, ArrowLeft } from "lucide-react";
@@ -573,6 +573,25 @@ export default function ChatPage() {
     Hash;
   const headerDescription = channel?.description || lane?.description || null;
 
+  // Build channel info for the empty state in MessageList
+  const channelInfoForList: ChannelInfo | null = channel
+    ? {
+        name: channel.name,
+        slug: channel.slug,
+        description: headerDescription,
+        lane: lane ? { icon: lane.icon, color: lane.color } : null,
+      }
+    : null;
+
+  // Focus the composer textarea from the empty-state CTA
+  const focusComposer = useCallback(() => {
+    // The Composer has a textarea -- find it by the aria-label
+    const ta = document.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Compose a thought for this channel"]'
+    );
+    ta?.focus();
+  }, []);
+
   return (
     <div className="flex h-full flex-col bg-gray-950">
       {/* Channel header */}
@@ -645,6 +664,8 @@ export default function ChatPage() {
         threadReplies={threadReplies}
         expandedThreads={expandedThreads}
         onToggleThread={handleToggleThread}
+        channelInfo={channelInfoForList}
+        onFocusComposer={focusComposer}
       />
 
       {/* Composer */}

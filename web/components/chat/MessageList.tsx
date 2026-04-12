@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import * as Icons from "lucide-react";
 import {
   Bot,
   ChevronDown,
   ChevronUp,
   Copy,
   ExternalLink,
+  Hash,
   Link as LinkIcon,
   MessageSquare,
   MessageSquareReply,
   MessagesSquare,
   Newspaper,
+  Rss,
+  Send,
   Sparkles,
 } from "lucide-react";
 
@@ -355,28 +359,81 @@ function ThreadIndicator({
   replyCount,
   expanded,
   onToggle,
+  replies,
 }: {
   replyCount: number;
   expanded: boolean;
   onToggle: () => void;
+  replies?: Message[];
 }) {
+  // Collect unique participants for overlapping avatars (first 3)
+  const participants = useMemo(() => {
+    if (!replies || replies.length === 0) return [];
+    const seen = new Set<string>();
+    const result: { id: string; name: string; isAgent: boolean }[] = [];
+    for (const r of replies) {
+      const aid = r.author?.id;
+      if (!aid || seen.has(aid)) continue;
+      seen.add(aid);
+      result.push({
+        id: aid,
+        name: authorDisplayName(r.author),
+        isAgent: r.author?.kind === "agent",
+      });
+      if (result.length >= 3) break;
+    }
+    return result;
+  }, [replies]);
+
+  // Most recent reply preview
+  const lastReply = replies && replies.length > 0 ? replies[replies.length - 1] : null;
+  const preview = lastReply
+    ? `${authorDisplayName(lastReply.author)}: ${lastReply.body.slice(0, 60)}${lastReply.body.length > 60 ? "..." : ""}`
+    : null;
+
   return (
     <button
       onClick={onToggle}
-      className="ml-12 mt-1 flex items-center gap-1.5 text-purple-400 text-xs cursor-pointer hover:text-purple-300 transition-colors"
+      className="ml-12 mt-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-all cursor-pointer hover:bg-purple-500/10 group/thread"
     >
-      <MessageSquare className="h-3 w-3" />
-      <span>
+      {/* Overlapping avatar circles */}
+      {participants.length > 0 && (
+        <div className="flex -space-x-1.5 flex-shrink-0">
+          {participants.map((p) => (
+            <div
+              key={p.id}
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ring-2 ring-gray-950 ${
+                p.isAgent
+                  ? "bg-purple-500/30 text-purple-200"
+                  : "bg-gray-700 text-gray-200"
+              }`}
+              title={p.name}
+            >
+              {p.isAgent ? (
+                <Bot className="h-2.5 w-2.5" />
+              ) : (
+                p.name[0]?.toUpperCase() || "?"
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <span className="text-purple-400 font-medium group-hover/thread:text-purple-300">
         {replyCount} {replyCount === 1 ? "reply" : "replies"}
       </span>
-      <span className="text-gray-600">—</span>
-      <span className="text-gray-500">
-        {expanded ? "click to collapse" : "click to expand"}
-      </span>
+
+      {/* Last reply preview (only when collapsed) */}
+      {!expanded && preview && (
+        <span className="hidden sm:inline max-w-[280px] truncate text-gray-500 group-hover/thread:text-gray-400">
+          {preview}
+        </span>
+      )}
+
       {expanded ? (
-        <ChevronUp className="h-3 w-3 text-gray-500" />
+        <ChevronUp className="h-3 w-3 text-gray-500 group-hover/thread:text-purple-400" />
       ) : (
-        <ChevronDown className="h-3 w-3 text-gray-500" />
+        <ChevronDown className="h-3 w-3 text-gray-500 group-hover/thread:text-purple-400" />
       )}
     </button>
   );
@@ -386,7 +443,7 @@ function ThreadIndicator({
 function ThreadReplies({ replies }: { replies: Message[] }) {
   return (
     <div className="ml-12 mt-1 border-l-2 border-purple-500/30 pl-4 space-y-0.5">
-      {replies.map((reply) => {
+      {replies.map((reply, idx) => {
         const author = reply.author;
         const isAgent = author?.kind === "agent";
         const displayName = authorDisplayName(author);
@@ -396,9 +453,10 @@ function ThreadReplies({ replies }: { replies: Message[] }) {
           <div
             key={reply.id}
             id={`msg-${reply.id}`}
-            className={`group relative flex gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-gray-900/60 ${
+            className={`group relative flex gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-gray-900/60 animate-thread-reply-in ${
               isAgent ? "hover:bg-purple-950/20" : ""
             }`}
+            style={{ animationDelay: `${idx * 50}ms` }}
           >
             {/* Avatar */}
             <div className="w-7 flex-shrink-0">
@@ -464,6 +522,32 @@ export interface ReplyTarget {
   preview: string;
 }
 
+/** Channel context passed for richer empty states */
+export interface ChannelInfo {
+  name: string;
+  slug: string;
+  description: string | null;
+  lane?: {
+    icon: string | null;
+    color: string | null;
+  } | null;
+  isFeedChannel?: boolean;
+}
+
+// Lane color -> Tailwind class map for the empty state icon
+const EMPTY_STATE_ICON_COLORS: Record<string, { text: string; bg: string; ring: string }> = {
+  purple: { text: "text-purple-300", bg: "bg-purple-500/10", ring: "ring-purple-400/20" },
+  amber: { text: "text-amber-300", bg: "bg-amber-500/10", ring: "ring-amber-400/20" },
+  blue: { text: "text-blue-300", bg: "bg-blue-500/10", ring: "ring-blue-400/20" },
+  emerald: { text: "text-emerald-300", bg: "bg-emerald-500/10", ring: "ring-emerald-400/20" },
+  sky: { text: "text-sky-300", bg: "bg-sky-500/10", ring: "ring-sky-400/20" },
+  rose: { text: "text-rose-300", bg: "bg-rose-500/10", ring: "ring-rose-400/20" },
+};
+const DEFAULT_EMPTY_ICON = { text: "text-purple-300", bg: "bg-purple-500/10", ring: "ring-purple-400/20" };
+
+/** Known feed-only channel slugs */
+const FEED_CHANNEL_SLUGS = new Set(["daily-ai-brief", "mcp-oss-intel"]);
+
 export default function MessageList({
   messages,
   loading,
@@ -471,6 +555,8 @@ export default function MessageList({
   threadReplies,
   expandedThreads,
   onToggleThread,
+  channelInfo,
+  onFocusComposer,
 }: {
   messages: Message[];
   loading: boolean;
@@ -478,6 +564,8 @@ export default function MessageList({
   threadReplies?: Record<string, Message[]>;
   expandedThreads?: Set<string>;
   onToggleThread?: (messageId: string) => void;
+  channelInfo?: ChannelInfo | null;
+  onFocusComposer?: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -557,21 +645,96 @@ export default function MessageList({
   }
 
   if (messages.length === 0) {
+    const isFeed =
+      channelInfo?.isFeedChannel ||
+      (channelInfo?.slug && FEED_CHANNEL_SLUGS.has(channelInfo.slug));
+
+    // Resolve lane icon
+    const laneIconName = channelInfo?.lane?.icon;
+    const LaneIcon =
+      laneIconName
+        ? (Icons as unknown as Record<string, Icons.LucideIcon>)[laneIconName] || Hash
+        : null;
+    const laneColor = channelInfo?.lane?.color;
+    const iconStyle =
+      (laneColor && EMPTY_STATE_ICON_COLORS[laneColor]) || DEFAULT_EMPTY_ICON;
+
     return (
-      <div className="flex flex-1 items-center justify-center px-6 py-10">
-        <div className="flex max-w-sm flex-col items-center text-center">
-          <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-gray-900">
-            <MessagesSquare className="h-7 w-7 text-purple-300" />
+      <div className="flex flex-1 items-center justify-center px-6 py-10 animate-fade-in">
+        <div className="flex max-w-md flex-col items-center text-center">
+          {/* Large icon -- lane-colored when available */}
+          <div
+            className={`relative mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border ${
+              LaneIcon
+                ? `${iconStyle.bg} border-transparent ring-1 ${iconStyle.ring}`
+                : "border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-gray-900"
+            }`}
+          >
+            {LaneIcon ? (
+              <LaneIcon className={`h-9 w-9 ${iconStyle.text}`} />
+            ) : isFeed ? (
+              <Rss className="h-9 w-9 text-purple-300" />
+            ) : (
+              <MessagesSquare className="h-9 w-9 text-purple-300" />
+            )}
             <Sparkles className="absolute -right-1 -top-1 h-4 w-4 text-purple-400" />
           </div>
-          <h3 className="mb-1.5 text-base font-semibold text-gray-200">
-            This channel is quiet
-          </h3>
-          <p className="text-sm leading-relaxed text-gray-500">
-            Be the first to think out loud. Humans and agents in this channel
-            share one memory &mdash; anything you post here feeds the group
-            mind.
-          </p>
+
+          {/* Channel name */}
+          {channelInfo?.name && (
+            <div className="mb-2 flex items-center gap-2">
+              <Hash className="h-4 w-4 text-gray-600" />
+              <h2 className="text-lg font-bold text-gray-100">
+                {channelInfo.name}
+              </h2>
+            </div>
+          )}
+
+          {/* Channel description */}
+          {channelInfo?.description && (
+            <p className="mb-4 max-w-sm text-sm leading-relaxed text-gray-400">
+              {channelInfo.description}
+            </p>
+          )}
+
+          {/* CTA */}
+          {isFeed ? (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-gray-200">
+                No feed items yet
+              </h3>
+              <p className="text-sm leading-relaxed text-gray-500">
+                Add a feed source in{" "}
+                <a
+                  href="/feeds"
+                  className="text-purple-400 underline decoration-purple-400/40 underline-offset-2 hover:text-purple-300"
+                >
+                  /feeds
+                </a>{" "}
+                to start populating this channel automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {!channelInfo?.name && (
+                <h3 className="text-base font-semibold text-gray-200">
+                  This channel is quiet
+                </h3>
+              )}
+              <p className="text-sm leading-relaxed text-gray-500">
+                Humans and agents share one memory here &mdash; anything you
+                post feeds the group mind.
+              </p>
+              <button
+                type="button"
+                onClick={() => onFocusComposer?.()}
+                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-[0_0_16px_-4px_rgba(168,85,247,0.5)] transition-all hover:bg-purple-500 hover:shadow-[0_0_20px_-4px_rgba(168,85,247,0.6)]"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Be the first to post
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -757,6 +920,7 @@ export default function MessageList({
                       replyCount={replyCount}
                       expanded={isExpanded}
                       onToggle={() => onToggleThread(msg.id)}
+                      replies={replies}
                     />
                   )}
                 </div>
