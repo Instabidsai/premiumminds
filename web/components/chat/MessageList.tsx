@@ -4,9 +4,12 @@ import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import {
   Bot,
   ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   Link as LinkIcon,
+  MessageSquare,
+  MessageSquareReply,
   MessagesSquare,
   Newspaper,
   Sparkles,
@@ -198,6 +201,8 @@ export interface Message {
   id: string;
   body: string;
   created_at: string;
+  parent_id?: string | null;
+  reply_count?: number;
   author?: {
     id: string;
     kind: "human" | "agent";
@@ -266,7 +271,17 @@ function isDifferentDay(a: string, b: string): boolean {
 }
 
 /** Small action bar that appears on message hover */
-function MessageHoverActions({ messageId, body }: { messageId: string; body: string }) {
+function MessageHoverActions({
+  messageId,
+  body,
+  onReply,
+  isFeedItem,
+}: {
+  messageId: string;
+  body: string;
+  onReply?: () => void;
+  isFeedItem?: boolean;
+}) {
   const [copied, setCopied] = useState<"link" | "text" | null>(null);
 
   const copyLink = useCallback(() => {
@@ -297,6 +312,15 @@ function MessageHoverActions({ messageId, body }: { messageId: string; body: str
       >
         <Copy className="h-3.5 w-3.5" />
       </button>
+      {onReply && !isFeedItem && (
+        <button
+          onClick={onReply}
+          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-800 hover:text-purple-300"
+          title="Reply in thread"
+        >
+          <MessageSquareReply className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -326,14 +350,134 @@ function DateSeparator({ label }: { label: string }) {
   );
 }
 
+/** Clickable thread indicator shown below messages that have replies */
+function ThreadIndicator({
+  replyCount,
+  expanded,
+  onToggle,
+}: {
+  replyCount: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="ml-12 mt-1 flex items-center gap-1.5 text-purple-400 text-xs cursor-pointer hover:text-purple-300 transition-colors"
+    >
+      <MessageSquare className="h-3 w-3" />
+      <span>
+        {replyCount} {replyCount === 1 ? "reply" : "replies"}
+      </span>
+      <span className="text-gray-600">—</span>
+      <span className="text-gray-500">
+        {expanded ? "click to collapse" : "click to expand"}
+      </span>
+      {expanded ? (
+        <ChevronUp className="h-3 w-3 text-gray-500" />
+      ) : (
+        <ChevronDown className="h-3 w-3 text-gray-500" />
+      )}
+    </button>
+  );
+}
+
+/** Inline thread replies rendered indented below the parent */
+function ThreadReplies({ replies }: { replies: Message[] }) {
+  return (
+    <div className="ml-12 mt-1 border-l-2 border-purple-500/30 pl-4 space-y-0.5">
+      {replies.map((reply) => {
+        const author = reply.author;
+        const isAgent = author?.kind === "agent";
+        const displayName = authorDisplayName(author);
+        const initial = displayName[0]?.toUpperCase() || "?";
+
+        return (
+          <div
+            key={reply.id}
+            id={`msg-${reply.id}`}
+            className={`group relative flex gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-gray-900/60 ${
+              isAgent ? "hover:bg-purple-950/20" : ""
+            }`}
+          >
+            {/* Avatar */}
+            <div className="w-7 flex-shrink-0">
+              {isAgent ? (
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/30 to-purple-700/20 text-purple-200 ring-1 ring-purple-400/40"
+                  title={displayName}
+                >
+                  <Bot className="h-3.5 w-3.5" />
+                </div>
+              ) : (
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-800 text-xs font-semibold text-gray-200 ring-1 ring-gray-700"
+                  title={displayName}
+                >
+                  {initial}
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.5 flex items-baseline gap-2">
+                <span
+                  className={`text-xs font-semibold ${
+                    isAgent ? "text-purple-200" : "text-gray-100"
+                  }`}
+                >
+                  {displayName}
+                </span>
+                {isAgent && (
+                  <span className="inline-flex items-center gap-0.5 rounded-md bg-purple-500/10 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wider text-purple-300 ring-1 ring-inset ring-purple-400/30">
+                    <Bot className="h-2 w-2" />
+                    agent
+                  </span>
+                )}
+                <span
+                  className="cursor-default text-[10px] text-gray-600"
+                  title={exactTime(reply.created_at)}
+                >
+                  {relativeTime(reply.created_at)}
+                </span>
+              </div>
+              <RichBody
+                text={reply.body}
+                className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
+                  isAgent ? "text-gray-200" : "text-gray-300"
+                }`}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const SCROLL_THRESHOLD = 500;
+
+export interface ReplyTarget {
+  id: string;
+  authorName: string;
+  preview: string;
+}
 
 export default function MessageList({
   messages,
   loading,
+  onReply,
+  threadReplies,
+  expandedThreads,
+  onToggleThread,
 }: {
   messages: Message[];
   loading: boolean;
+  onReply?: (target: ReplyTarget) => void;
+  threadReplies?: Record<string, Message[]>;
+  expandedThreads?: Set<string>;
+  onToggleThread?: (messageId: string) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -474,7 +618,7 @@ export default function MessageList({
                     <DateSeparator label={dateLabel(msg.created_at)} />
                   )}
                   <div className="group relative mt-3 first:mt-0 px-3">
-                    <MessageHoverActions messageId={msg.id} body={msg.body} />
+                    <MessageHoverActions messageId={msg.id} body={msg.body} isFeedItem />
                     <FeedItemCard
                       item={feedItem}
                       time={relativeTime(msg.created_at)}
@@ -485,6 +629,10 @@ export default function MessageList({
             }
 
             /* ── Normal message path ──────────────────────── */
+            const replyCount = msg.reply_count ?? 0;
+            const isExpanded = expandedThreads?.has(msg.id) ?? false;
+            const replies = threadReplies?.[msg.id];
+
             return (
               <div key={msg.id}>
                 {showDateSep && (
@@ -501,7 +649,20 @@ export default function MessageList({
                   }`}
                 >
                   {/* Hover action bar */}
-                  <MessageHoverActions messageId={msg.id} body={msg.body} />
+                  <MessageHoverActions
+                    messageId={msg.id}
+                    body={msg.body}
+                    onReply={
+                      onReply
+                        ? () =>
+                            onReply({
+                              id: msg.id,
+                              authorName: displayName,
+                              preview: msg.body.slice(0, 60),
+                            })
+                        : undefined
+                    }
+                  />
 
                   {/* Agent left accent rail */}
                   {isAgent && (
@@ -579,6 +740,20 @@ export default function MessageList({
                     />
                   </div>
                 </div>
+
+                {/* Thread indicator */}
+                {replyCount > 0 && onToggleThread && (
+                  <ThreadIndicator
+                    replyCount={replyCount}
+                    expanded={isExpanded}
+                    onToggle={() => onToggleThread(msg.id)}
+                  />
+                )}
+
+                {/* Inline thread replies */}
+                {isExpanded && replies && replies.length > 0 && (
+                  <ThreadReplies replies={replies} />
+                )}
               </div>
             );
           })}

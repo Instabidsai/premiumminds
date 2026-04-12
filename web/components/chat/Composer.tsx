@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Send, Sparkles, Network, CornerDownLeft } from "lucide-react";
+import { Send, Sparkles, Network, CornerDownLeft, X } from "lucide-react";
 
 // Static class maps — Tailwind JIT can't compile dynamic class names.
 const LANE_ACCENT: Record<
@@ -57,14 +57,24 @@ const PLACEHOLDERS = [
 // Line height ~20px + padding — cap around 184px.
 const MAX_HEIGHT_PX = 184;
 
+export interface ReplyingTo {
+  id: string;
+  authorName: string;
+  preview: string;
+}
+
 export default function Composer({
   onSend,
   disabled,
   laneColor,
+  replyingTo,
+  onCancelReply,
 }: {
   onSend: (text: string) => void | Promise<void>;
   disabled: boolean;
   laneColor?: string | null;
+  replyingTo?: ReplyingTo | null;
+  onCancelReply?: () => void;
 }) {
   const [text, setText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -129,6 +139,31 @@ export default function Composer({
           className={`pointer-events-none absolute inset-y-3 left-0 w-[2px] rounded-full ${accent.bar}`}
           aria-hidden
         />
+
+        {/* Replying-to bar */}
+        {replyingTo && (
+          <div className="flex items-center gap-2 bg-purple-500/10 border-l-2 border-purple-500 px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1 truncate text-gray-300">
+              Replying to{" "}
+              <span className="font-semibold text-purple-300">
+                {replyingTo.authorName}
+              </span>
+              :{" "}
+              <span className="text-gray-500">
+                {replyingTo.preview.length > 60
+                  ? replyingTo.preview.slice(0, 60) + "..."
+                  : replyingTo.preview}
+              </span>
+            </span>
+            <button
+              onClick={onCancelReply}
+              className="flex-shrink-0 rounded p-0.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
+              title="Cancel reply"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Input row */}
         <div className="flex items-end gap-2 px-3 pt-3 pb-2 sm:gap-3 sm:px-5 sm:pt-4 sm:pb-3">

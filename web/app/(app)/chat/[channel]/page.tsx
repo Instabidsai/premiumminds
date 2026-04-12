@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase";
-import MessageList, { type Message } from "@/components/chat/MessageList";
-import Composer from "@/components/chat/Composer";
+import MessageList, { type Message, type ReplyTarget } from "@/components/chat/MessageList";
+import Composer, { type ReplyingTo } from "@/components/chat/Composer";
 import * as Icons from "lucide-react";
 import { Hash, Users, Compass, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +47,19 @@ interface RawMessageRow {
           | null;
       }[]
     | null;
+}
+
+interface RpcMessageRow {
+  id: string;
+  body: string;
+  created_at: string;
+  parent_id: string | null;
+  author_id: string;
+  author_kind: string;
+  agent_name: string | null;
+  member_handle: string | null;
+  member_display_name: string | null;
+  reply_count: number | string;
 }
 
 // Tailwind can't compile dynamic class names, so map lane color -> static classes.
@@ -145,6 +158,9 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ReplyingTo | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [threadReplies, setThreadReplies] = useState<Record<string, Message[]>>({});
   const [pinnedMessages, setPinnedMessages] = useState<
     { id: string; message: string; link_to_channel: string | null; link_label: string | null }[]
   >([]);
@@ -242,26 +258,32 @@ export default function ChatPage() {
         // ignore — header falls back to default treatment
       }
 
-      // Fetch messages with author + member joined
-      const { data: msgs } = await supabase
-        .from("messages")
-        .select(
-          `
-          id, body, created_at,
-          author:authors!messages_author_id_fkey (
-            id, kind, agent_name,
-            member:members!authors_member_id_fkey ( handle, display_name )
-          )
-        `
-        )
-        .eq("channel_id", ch.id)
-        .order("created_at", { ascending: true })
-        .limit(200);
+      // Fetch top-level messages via RPC (includes reply_count, excludes thread replies)
+      const { data: rpcRows } = await supabase.rpc("get_channel_messages", {
+        p_channel_id: ch.id,
+        p_limit: 200,
+      });
 
       if (!mounted) return;
 
-      if (msgs) {
-        setMessages((msgs as unknown as RawMessageRow[]).map(normalizeMessage));
+      if (rpcRows) {
+        const mapped: Message[] = (rpcRows as RpcMessageRow[]).map((r) => ({
+          id: r.id,
+          body: r.body,
+          created_at: r.created_at,
+          parent_id: r.parent_id,
+          reply_count: Number(r.reply_count) || 0,
+          author: {
+            id: r.author_id,
+            kind: r.author_kind as "human" | "agent",
+            agent_name: r.agent_name,
+            member:
+              r.member_handle != null
+                ? { handle: r.member_handle, display_name: r.member_display_name }
+                : null,
+          },
+        }));
+        setMessages(mapped);
       }
       setLoading(false);
 
@@ -297,6 +319,7 @@ export default function ChatPage() {
             body: string;
             created_at: string;
             author_id: string;
+            parent_id: string | null;
           };
 
           // Fetch author + member for the new message
@@ -320,6 +343,7 @@ export default function ChatPage() {
             id: newMsg.id,
             body: newMsg.body,
             created_at: newMsg.created_at,
+            parent_id: newMsg.parent_id,
             author: author
               ? {
                   id: author.id,
@@ -330,10 +354,29 @@ export default function ChatPage() {
               : null,
           };
 
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === fullMsg.id)) return prev;
-            return [...prev, fullMsg];
-          });
+          if (newMsg.parent_id) {
+            // This is a thread reply — increment reply_count on the parent
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === newMsg.parent_id
+                  ? { ...m, reply_count: (m.reply_count ?? 0) + 1 }
+                  : m
+              )
+            );
+            // If thread is expanded, add the reply to the inline view
+            setThreadReplies((prev) => {
+              const existing = prev[newMsg.parent_id!];
+              if (!existing) return prev; // Thread not loaded yet
+              if (existing.some((r) => r.id === fullMsg.id)) return prev;
+              return { ...prev, [newMsg.parent_id!]: [...existing, fullMsg] };
+            });
+          } else {
+            // Top-level message — add to the main feed
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === fullMsg.id)) return prev;
+              return [...prev, { ...fullMsg, reply_count: 0 }];
+            });
+          }
 
           // Mark channel as read on each new message while viewing
           if (authUserId && channel) {
@@ -417,15 +460,23 @@ export default function ChatPage() {
           author = newAuthor;
         }
 
-        // 3. Insert the message
-        const { error: msgErr } = await supabase.from("messages").insert({
+        // 3. Insert the message (with optional parent_id for thread replies)
+        const insertPayload: Record<string, unknown> = {
           channel_id: channel.id,
           author_id: author.id,
           body: text,
-        });
+        };
+        if (replyingTo) {
+          insertPayload.parent_id = replyingTo.id;
+        }
+
+        const { error: msgErr } = await supabase.from("messages").insert(insertPayload);
 
         if (msgErr) {
           console.error("Failed to send message:", msgErr);
+        } else if (replyingTo) {
+          // Clear reply state on success
+          setReplyingTo(null);
         }
       } catch (err) {
         console.error("Failed to send message:", err);
@@ -433,8 +484,62 @@ export default function ChatPage() {
         setSending(false);
       }
     },
-    [channel, authUserId, supabase]
+    [channel, authUserId, supabase, replyingTo]
   );
+
+  // Fetch thread replies for a given parent message
+  const fetchThreadReplies = useCallback(
+    async (parentId: string) => {
+      const { data: rows } = await supabase
+        .from("messages")
+        .select(
+          `
+          id, body, created_at, parent_id,
+          author:authors!messages_author_id_fkey (
+            id, kind, agent_name,
+            member:members!authors_member_id_fkey ( handle, display_name )
+          )
+        `
+        )
+        .eq("parent_id", parentId)
+        .order("created_at", { ascending: true });
+
+      if (rows) {
+        const mapped = (rows as unknown as RawMessageRow[]).map(normalizeMessage);
+        setThreadReplies((prev) => ({ ...prev, [parentId]: mapped }));
+      }
+    },
+    [supabase]
+  );
+
+  // Toggle thread expansion (fetch replies on first expand)
+  const handleToggleThread = useCallback(
+    (messageId: string) => {
+      setExpandedThreads((prev) => {
+        const next = new Set(prev);
+        if (next.has(messageId)) {
+          next.delete(messageId);
+        } else {
+          next.add(messageId);
+          // Fetch replies if not already loaded
+          if (!threadReplies[messageId]) {
+            fetchThreadReplies(messageId);
+          }
+        }
+        return next;
+      });
+    },
+    [threadReplies, fetchThreadReplies]
+  );
+
+  // Handle reply button click from MessageList
+  const handleReply = useCallback((target: ReplyTarget) => {
+    setReplyingTo({
+      id: target.id,
+      authorName: target.authorName,
+      preview: target.preview,
+    });
+  }, []);
 
   if (!loading && !channel) {
     return (
@@ -533,13 +638,22 @@ export default function ChatPage() {
       )}
 
       {/* Messages */}
-      <MessageList messages={messages} loading={loading} />
+      <MessageList
+        messages={messages}
+        loading={loading}
+        onReply={handleReply}
+        threadReplies={threadReplies}
+        expandedThreads={expandedThreads}
+        onToggleThread={handleToggleThread}
+      />
 
       {/* Composer */}
       <Composer
         onSend={handleSend}
         disabled={sending || loading}
         laneColor={lane?.color ?? null}
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
       />
     </div>
   );
