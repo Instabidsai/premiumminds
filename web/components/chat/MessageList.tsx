@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useMemo } from "react";
-import { Bot, MessagesSquare, Sparkles } from "lucide-react";
+import { Bot, ExternalLink, MessagesSquare, Newspaper, Sparkles } from "lucide-react";
 
 const URL_REGEX = /(https?:\/\/[^\s)<>"]+)/g;
 const BOLD_REGEX = /\*\*(.+?)\*\*/g;
@@ -57,6 +57,131 @@ function RichBody({ text, className }: { text: string; className?: string }) {
         );
       })}
     </p>
+  );
+}
+
+/* ── Feed-item detection & card ────────────────────────────────── */
+
+interface ParsedFeedItem {
+  title: string;
+  url: string;
+  domain: string;
+  description: string;
+  author: string | null;
+  source: string | null;
+}
+
+/** Returns parsed feed data when a message looks like a fetcher card, else null */
+function parseFeedItem(
+  body: string,
+  authorKind?: string,
+  agentName?: string | null,
+): ParsedFeedItem | null {
+  const isFetcherAgent =
+    authorKind === "agent" && agentName === "groupmind.fetcher";
+  const matchesPattern =
+    body.startsWith("**") && /_via\s/.test(body);
+
+  if (!isFetcherAgent && !matchesPattern) return null;
+
+  // Title: first **...**
+  const titleMatch = body.match(/\*\*(.+?)\*\*/);
+  if (!titleMatch) return null;
+  const title = titleMatch[1];
+
+  // URL: first http(s) link
+  const urlMatch = body.match(URL_REGEX);
+  const url = urlMatch ? urlMatch[0] : "";
+
+  // Domain from URL
+  let domain = "";
+  try {
+    domain = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    // leave empty
+  }
+
+  // Author: _by ..._ (underscore-italic pattern)
+  const authorMatch = body.match(/_by\s+(.+?)_/);
+  const author = authorMatch ? authorMatch[1].trim() : null;
+
+  // Source: _via ..._
+  const sourceMatch = body.match(/_via\s+(.+?)_/);
+  const source = sourceMatch ? sourceMatch[1].trim() : null;
+
+  // Description: text between the URL line and the _by / _via lines.
+  // Strategy: strip the title line, URL line, author line, and source line,
+  // then whatever is left is the description.
+  let desc = body;
+  // Remove bold title
+  desc = desc.replace(/\*\*.+?\*\*/, "");
+  // Remove URL
+  if (url) desc = desc.replace(url, "");
+  // Remove _by ..._ and _via ..._
+  desc = desc.replace(/_by\s+.+?_/, "");
+  desc = desc.replace(/_via\s+.+?_/, "");
+  // Collapse whitespace
+  desc = desc.replace(/\n{2,}/g, "\n").trim();
+
+  return { title, url, domain, description: desc, author, source };
+}
+
+function FeedItemCard({
+  item,
+  time,
+}: {
+  item: ParsedFeedItem;
+  time: string;
+}) {
+  return (
+    <div className="my-2 max-w-xl overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50 transition-colors hover:border-gray-700 hover:bg-gray-900/70">
+      {/* Top bar with icon */}
+      <div className="flex items-start gap-3 px-4 pt-4 pb-2">
+        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+          <Newspaper className="h-4 w-4 text-purple-300" />
+        </div>
+        <div className="min-w-0 flex-1">
+          {/* Title as link */}
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-sm font-semibold leading-snug text-gray-100 transition-colors hover:text-purple-300"
+          >
+            {item.title}
+          </a>
+          {/* Domain */}
+          {item.domain && (
+            <span className="text-xs text-gray-500">{item.domain}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      {item.description && (
+        <p className="px-4 pb-2 text-sm leading-relaxed text-gray-400 line-clamp-3">
+          {item.description}
+        </p>
+      )}
+
+      {/* Footer: meta + open button */}
+      <div className="flex items-center justify-between border-t border-gray-800/60 px-4 py-2.5">
+        <span className="text-xs text-gray-500">
+          {[item.author && `by ${item.author}`, item.source && `via ${item.source}`, time]
+            .filter(Boolean)
+            .join(" \u00b7 ")}
+        </span>
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 rounded-md bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700 hover:text-gray-100"
+        >
+          Open
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    </div>
   );
 }
 
@@ -210,6 +335,28 @@ export default function MessageList({
 
           const initial = displayName[0]?.toUpperCase() || "?";
 
+          /* ── Feed-item card path ──────────────────────── */
+          const feedItem = parseFeedItem(
+            msg.body,
+            author?.kind,
+            author?.agent_name,
+          );
+
+          if (feedItem) {
+            return (
+              <div
+                key={msg.id}
+                className="mt-3 first:mt-0 px-3"
+              >
+                <FeedItemCard
+                  item={feedItem}
+                  time={relativeTime(msg.created_at)}
+                />
+              </div>
+            );
+          }
+
+          /* ── Normal message path ──────────────────────── */
           return (
             <div
               key={msg.id}
