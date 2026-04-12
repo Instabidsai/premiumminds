@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   Plus,
+  Plug,
 } from "lucide-react";
 import CreateChannelModal from "@/components/channels/CreateChannelModal";
 
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { href: "/build-vs-raid", label: "Build vs Raid", icon: Scale },
   { href: "/requests", label: "Feature Requests", icon: Lightbulb },
   { href: "/feeds", label: "Feeds", icon: Rss },
+  { href: "/setup", label: "Setup", icon: Plug },
 ];
 
 // Tailwind needs full class strings at build time, so we map lane colors -> classes.
