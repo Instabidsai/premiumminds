@@ -150,7 +150,7 @@ function FeedItemCard({
   time: string;
 }) {
   return (
-    <div className="my-2 max-w-xl overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50 transition-colors hover:border-gray-700 hover:bg-gray-900/70">
+    <div className="feed-card-lift my-2 max-w-xl overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50 transition-colors hover:border-gray-700 hover:bg-gray-900/70">
       {/* Top bar with icon */}
       <div className="flex items-start gap-3 px-4 pt-4 pb-2">
         <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
@@ -360,11 +360,13 @@ function ThreadIndicator({
   expanded,
   onToggle,
   replies,
+  parentIsAgent,
 }: {
   replyCount: number;
   expanded: boolean;
   onToggle: () => void;
   replies?: Message[];
+  parentIsAgent?: boolean;
 }) {
   // Collect unique participants for overlapping avatars (first 3)
   const participants = useMemo(() => {
@@ -394,7 +396,11 @@ function ThreadIndicator({
   return (
     <button
       onClick={onToggle}
-      className="ml-12 mt-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-all cursor-pointer hover:bg-purple-500/10 group/thread"
+      className={`ml-12 mt-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-all cursor-pointer hover:bg-purple-500/10 group/thread border-l-2 ${
+        parentIsAgent
+          ? "border-purple-500/40"
+          : "border-gray-600/40"
+      }`}
     >
       {/* Overlapping avatar circles */}
       {participants.length > 0 && (
@@ -780,7 +786,7 @@ export default function MessageList({
                   {showDateSep && (
                     <DateSeparator label={dateLabel(msg.created_at)} />
                   )}
-                  <div className="group relative mt-3 first:mt-0 px-3">
+                  <div className="group relative mt-3 first:mt-0 px-3 animate-msg-enter">
                     <MessageHoverActions messageId={msg.id} body={msg.body} isFeedItem />
                     <FeedItemCard
                       item={feedItem}
@@ -803,11 +809,11 @@ export default function MessageList({
                 )}
                 <div
                   id={`msg-${msg.id}`}
-                  className={`group relative flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-gray-900/60 ${
+                  className={`animate-msg-enter group relative flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-gray-900/60 ${
                     sameAuthor ? "" : "mt-4 first:mt-0"
                   } ${
                     isAgent
-                      ? "hover:bg-purple-950/20"
+                      ? "bg-purple-950/5 hover:bg-purple-950/20"
                       : ""
                   }`}
                 >
@@ -921,6 +927,7 @@ export default function MessageList({
                       expanded={isExpanded}
                       onToggle={() => onToggleThread(msg.id)}
                       replies={replies}
+                      parentIsAgent={isAgent}
                     />
                   )}
                 </div>
@@ -943,7 +950,7 @@ export default function MessageList({
             scrollToBottom();
             setNewMsgCount(0);
           }}
-          className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-purple-500/40 bg-gray-900/95 px-4 py-1.5 text-xs font-medium text-purple-200 shadow-lg backdrop-blur transition-colors hover:border-purple-400/60 hover:bg-gray-800/95"
+          className="animate-pill-bounce absolute bottom-4 left-1/2 z-20 rounded-full border border-purple-500/40 bg-gray-900/95 px-4 py-1.5 text-xs font-medium text-purple-200 shadow-lg backdrop-blur transition-colors hover:border-purple-400/60 hover:bg-gray-800/95"
         >
           <ChevronDown className="-ml-0.5 mr-1 inline-block h-3.5 w-3.5" />
           {newMsgCount} new message{newMsgCount === 1 ? "" : "s"}

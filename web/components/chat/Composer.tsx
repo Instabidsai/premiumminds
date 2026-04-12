@@ -132,7 +132,7 @@ export default function Composer({
   return (
     <div className="border-t border-gray-800 bg-gray-900/50 px-3 py-3 backdrop-blur sm:px-6 sm:py-5">
       <div
-        className={`group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/80 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-colors ring-1 ring-transparent focus-within:ring-1 ${accent.ring}`}
+        className={`composer-gradient-border group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/80 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-colors ring-1 ring-transparent focus-within:ring-1 ${accent.ring}`}
       >
         {/* Lane color accent strip on the left edge */}
         <div
@@ -142,7 +142,7 @@ export default function Composer({
 
         {/* Replying-to bar — PROMINENT so users know they're threading */}
         {replyingTo && (
-          <div className="flex items-center gap-3 bg-purple-500/15 border-l-4 border-purple-500 px-4 py-3 animate-fade-in">
+          <div className="flex items-center gap-3 bg-purple-500/15 border-l-4 border-purple-500 px-4 py-3 animate-slide-down">
             <CornerDownLeft className="h-4 w-4 flex-shrink-0 text-purple-400" />
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-0.5">
@@ -185,7 +185,7 @@ export default function Composer({
               rows={1}
               placeholder={PLACEHOLDERS[placeholderIndex]}
               aria-label="Compose a thought for this channel"
-              className="block w-full resize-none rounded-lg bg-gray-950/30 px-3 py-1.5 text-[15px] leading-6 text-gray-100 placeholder-gray-500 shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)] outline-none transition-[placeholder] duration-500 disabled:opacity-50"
+              className="placeholder-pulse block w-full resize-none rounded-lg bg-gray-950/30 px-3 py-1.5 text-[15px] leading-6 text-gray-100 placeholder-gray-500 shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)] outline-none transition-[placeholder] duration-500 disabled:opacity-50"
             />
           </div>
 
@@ -194,7 +194,7 @@ export default function Composer({
             onClick={handleSend}
             disabled={!canSend}
             aria-label={sending ? "Sending…" : "Send message"}
-            className={`flex h-11 min-w-[44px] flex-shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all sm:h-9 sm:min-w-0 ${
+            className={`send-btn-click flex h-11 min-w-[44px] flex-shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-all sm:h-9 sm:min-w-0 ${
               canSend
                 ? "bg-purple-600 text-white shadow-[0_0_12px_-2px_rgba(168,85,247,0.45)] hover:bg-purple-500 hover:shadow-[0_0_18px_-2px_rgba(168,85,247,0.55)]"
                 : "bg-gray-800 text-gray-500"
@@ -213,6 +213,15 @@ export default function Composer({
             )}
           </button>
         </div>
+
+        {/* Character count — faint, only visible when > 200 chars */}
+        {text.length > 200 && (
+          <div className="flex justify-end px-5 pb-1 -mt-1">
+            <span className="text-[10px] text-gray-600/50 tabular-nums">
+              {text.length}
+            </span>
+          </div>
+        )}
 
         {/* Footer hint strip — shortcuts + hive indicator. Hidden on small screens to save space. */}
         <div className="hidden items-center justify-between gap-4 border-t border-gray-800/40 bg-gray-950/30 px-5 py-1.5 text-[10px] text-gray-600 sm:flex">
