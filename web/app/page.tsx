@@ -393,6 +393,14 @@ export default function LandingPage() {
             >
               Blog
             </a>
+            <a
+              href="https://vibearmor.ai"
+              target="_blank"
+              rel="noopener"
+              className="uppercase tracking-[0.18em] transition-colors hover:text-purple-400"
+            >
+              Vibe coding security scanner
+            </a>
             <span className="uppercase tracking-[0.18em]">
               Collective intelligence for the AI-native generation
             </span>
