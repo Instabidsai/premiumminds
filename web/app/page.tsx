@@ -386,9 +386,17 @@ export default function LandingPage() {
           <span className="uppercase tracking-[0.18em]">
             premiumminds.io
           </span>
-          <span className="uppercase tracking-[0.18em]">
-            Collective intelligence for the AI-native generation
-          </span>
+          <div className="flex items-center gap-6">
+            <a
+              href="/blog"
+              className="uppercase tracking-[0.18em] transition-colors hover:text-purple-400"
+            >
+              Blog
+            </a>
+            <span className="uppercase tracking-[0.18em]">
+              Collective intelligence for the AI-native generation
+            </span>
+          </div>
         </footer>
       </div>
     </div>
